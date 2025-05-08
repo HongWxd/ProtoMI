@@ -159,12 +159,12 @@ total_labeled_df = total_labeled_df[~((total_labeled_df['type'] == 'Other') & (t
 total_labeled_df = total_labeled_df[~(total_labeled_df['type'] == '-1')]
 total_labeled_df.to_csv('./PubChem/processed_data/final_labeled_data.csv', index=False)# save the final labeled data
 
-# construct training data
+# construct labeled data
 cid_list = set(total_labeled_df['cid'].values.tolist())
 cids = []
 smiles = []
 labels = []
-for cid in cid_list:
+for cid in tqdm(cid_list, desc='Constructing labeled data...'):
     sub_labels_df = total_labeled_df.loc[total_labeled_df['cid'] == cid, 'label'].values.tolist()
     if 1 in sub_labels_df:
         labels.append(1)
@@ -173,8 +173,25 @@ for cid in cid_list:
     cids.append(cid)
     smiles.append(total_labeled_df.loc[total_labeled_df['cid'] == cid, 'smile'].values[0])
 
-training_data_df = pd.DataFrame()
-training_data_df['cid'] = cids
-training_data_df['smiles'] = smiles
-training_data_df['labels'] = labels
-training_data_df.to_csv('./data/training_data.csv', index=False)# save the labeled data for model training
+labeled_data_df = pd.DataFrame()
+labeled_data_df['cid'] = cids
+labeled_data_df['smiles'] = smiles
+labeled_data_df['labels'] = labels
+labeled_data_df.to_csv('./data/labeled_data.csv', index=False)# save the labeled data for model training
+
+# construct unlabeled data
+searching_space_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/searching_space_data.csv'))
+unlabeled_cid_list = searching_space_df['cid'].values.tolist()
+un_cids = []
+un_smiles = []
+for unlabeled_cid in tqdm(unlabeled_cid_list, desc='Constructing unlabeled data...'):
+    if unlabeled_cid in cid_list:
+        continue
+
+    un_cids.append(unlabeled_cid)
+    un_smiles.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'SMILES'].values[0])
+
+unlabeled_data_df = pd.DataFrame()
+unlabeled_data_df['cid'] = un_cids
+unlabeled_data_df['smiles'] = un_smiles
+unlabeled_data_df.to_csv('./data/unlabeled_data.csv', index=False)# save the labeled data for model training
