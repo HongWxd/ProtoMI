@@ -3,7 +3,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
-
+from torch_geometric.data import Data
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -87,7 +87,7 @@ def get_bond_features(bond,
 
     return np.array(bond_feature_vector)
 
-def create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y):
+def Graph_data_generator(x_smiles, y):
     """
     Inputs:
     
@@ -103,7 +103,6 @@ def create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y)
     data_list = []
     
     for (smiles, y_val) in zip(x_smiles, y):
-        
         # convert SMILES to RDKit mol object
         mol = Chem.MolFromSmiles(smiles)
 
@@ -114,6 +113,7 @@ def create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y)
         unrelated_mol = Chem.MolFromSmiles(unrelated_smiles)
         n_node_features = len(get_atom_features(unrelated_mol.GetAtomWithIdx(0)))
         n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
+        # print(smiles, n_nodes, n_edges, unrelated_smiles, unrelated_mol, n_node_features, n_edge_features)
 
         # construct node feature matrix X of shape (n_nodes, n_node_features)
         X = np.zeros((n_nodes, n_node_features))
@@ -145,14 +145,3 @@ def create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y)
         data_list.append(Data(x = X, edge_index = E, edge_attr = EF, y = y_tensor))
 
     return data_list
-
-
-
-
-
-
-
-data_df = pd.DataFrame(pd.read_csv('./data/final_labeled_data.csv'))
-print(data_df)
-
-# data_list = create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y)

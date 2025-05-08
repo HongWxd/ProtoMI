@@ -2,7 +2,6 @@ import os
 import csv
 from openai import OpenAI
 import PyPDF2
-from googletrans import Translator
 import pandas as pd
 from tqdm import tqdm
 
