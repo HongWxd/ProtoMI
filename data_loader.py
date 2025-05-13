@@ -18,14 +18,16 @@ class Dataset(Dataset):
 
         graph_dict = {}
         mask_dict = {}
+        num_features, num_edges = 0, 0
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
             _, _, smile, _, _, _, _, label = self.__getitem__(cid)
             try:
-                x, edge_index, edge_attr, y = Graph_data_generator(smile, label) # edge_attr: (n_edges, n_edge_features)
+                x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, label) # edge_attr: (n_edges, n_edge_features)
             except:
-                continue # while RDKit package can not convert smile into mol will drop this compound
-            graph_data = Data(x = x, edge_index = edge_index, y = y)
+                continue # if RDKit package can not convert smile into mol, we will drop this compound
+
+            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, label = label, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             graph_dict[cid] = graph_data
 
             # get the mask
@@ -48,7 +50,7 @@ class Dataset(Dataset):
         heavy_atom = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'heavy_atom'].values[0])
         labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
         if idx in labeled_cid_list:
-            label = self.labeled_data_df.loc[self.labeled_data_df['cid'] == idx, 'labels'].values[0]
+            label = self.labeled_data_df.loc[self.labeled_data_df['cid'] == idx, 'smile'].values[0]
         else:
             label = -1
         return idx, formula, smile, fingerprint, topological, weight, heavy_atom, label

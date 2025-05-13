@@ -299,12 +299,13 @@ def construct_unlabeled_data(labeled_data_df):
     unlabeled_data_df['heavy_atom'] = un_heavy_atoms
     unlabeled_data_df.to_csv('./data/unlabeled_data.csv', index=False)# save the labeled data for model training
 
-# preprocessed_papers_df = preprocess_papers_data()
-# preprocessed_patents_df = preprocess_patents_data()
-# total_labeled_df = pd.concat([preprocessed_papers_df, preprocessed_patents_df], ignore_index=True)
-# total_labeled_df = total_labeled_df[~((total_labeled_df['type'] == 'Other') & (total_labeled_df['label'] == '-1'))]
-# total_labeled_df = total_labeled_df[~(total_labeled_df['type'] == '-1')]
-# total_labeled_df.to_csv('./PubChem/processed_data/final_labeled_data.csv', index=False)# save the final labeled data
-total_labeled_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
+preprocessed_papers_df = preprocess_papers_data()
+preprocessed_patents_df = preprocess_patents_data()
+total_labeled_df = pd.concat([preprocessed_papers_df, preprocessed_patents_df], ignore_index=True)
+total_labeled_df = total_labeled_df[~((total_labeled_df['type'] == 'Other') & (total_labeled_df['label'] == '-1'))]
+total_labeled_df = total_labeled_df[~(total_labeled_df['type'] == '-1')]
+total_labeled_df.to_csv('./PubChem/processed_data/final_labeled_data.csv', index=False)# save the final labeled data
+
+# total_labeled_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
 labeled_data_df = construct_labeled_data(total_labeled_df)
-# construct_unlabeled_data(labeled_data_df)
+construct_unlabeled_data(labeled_data_df)

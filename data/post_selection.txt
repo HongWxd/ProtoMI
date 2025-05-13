@@ -205,4 +205,4 @@
  'B(C1=CC2=C(C=C1)N=CO2)(O)O',
  'B(C1=C(C=C(C=C1)C(F)(F)F)C(F)(F)F)(O)O',
  'B(O)(O)O',
- 'B(C1=C(C=CC(=C1)F)OC)(O)O'
+ 'B(C1=C(C=CC(=C1)F)OC)(O)O']

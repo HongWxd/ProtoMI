@@ -27,7 +27,6 @@ def get_atom_features(atom,
     """
 
     # define list of permitted atoms
-    
     permitted_list_of_atoms =  ['C','N','O','S','F','Si','P','Cl','Br','Mg','Na','Ca','Fe','As','Al','I', 'B','V','K','Tl','Yb','Sb','Sn','Ag','Pd','Co','Se','Ti','Zn', 'Li','Ge','Cu','Au','Ni','Cd','In','Mn','Zr','Cr','Pt','Hg','Pb','Unknown']
     
     if hydrogens_implicit == False:
@@ -117,7 +116,27 @@ def Graph_data_generator(x_smiles, y):
     x = X
     edge_index = E
     edge_attr = EF
-    y = y_tensor
+    label = y_tensor
+    n_nodes = n_nodes
+    n_edges = n_edges
+    n_node_features = n_node_features
+    n_edge_features = n_edge_features
 
-    return x, edge_index, edge_attr, y
+    return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
 
+# x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator('B1(OC(C(O1)(C)C)(C)C)C2=CC=NC=C2', 0)
+# graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, label = label, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
+# graph_dict = {}
+# graph_dict[111] = graph_data
+# nodes, edges, nodes_feature, edges_feature = 0, 0, 0, 0
+# for key, value in graph_dict.items():
+#     nodes += value.n_nodes
+#     edges += value.n_edges
+#     nodes_feature += value.n_node_features
+#     edges_feature += value.n_edge_features
+# print('nodes:', nodes)
+# print('edge:', edges)
+# print('nodes feature:', nodes_feature)
+# print('edges feature:', edges_feature)
+# print('degree:', 2 * edges)
+# print('avg degree:', 2 * edges / nodes)
