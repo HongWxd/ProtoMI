@@ -329,4 +329,4 @@ print('The searching space compounds information is save at: ./PubChem/processed
 battery_related_boron_dict = get_label_data(boron_df, battery_cids_final)
 battery_related_boron_dict.to_csv('./PubChem/processed_data/label_data_stage4.csv', index=False)
 print('The number of boron-containing compounds: ', len(set(battery_related_boron_dict['formula'].values.tolist())))
-print('And the boron-containing compounds information is save at: ./PubChem/processed_data/label_data.csv')
+print('And the boron-containing compounds information is save at: ./PubChem/processed_data/label_data_stage4.csv')

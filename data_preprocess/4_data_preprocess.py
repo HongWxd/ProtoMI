@@ -196,6 +196,7 @@ def construct_labeled_data(total_labeled_df):
 
     # post selection: use AI to screen the unreasonable compounds in the labeled data
     all_data_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))
+    AI_labeled_data_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
 
     cids = labeled_data_df['cid'].values.tolist()
     formulas = []
@@ -222,14 +223,30 @@ def construct_labeled_data(total_labeled_df):
     new_formulas = []
     new_cids = []
     new_labels = []
+    new_fingerprints = []
+    new_topologicals = []
+    new_weights = []
+    new_heavy_atoms = []
+    new_types = []
     for smile in smiles:
         new_cids.append(labeled_data_df.loc[labeled_data_df['smiles'] == smile, 'cid'].values[0])
         new_formulas.append(labeled_data_df.loc[labeled_data_df['smiles'] == smile, 'formula'].values[0])
         new_labels.append(labeled_data_df.loc[labeled_data_df['smiles'] == smile, 'labels'].values[0])
+        new_fingerprints.append(all_data_df.loc[all_data_df['SMILES'] == smile, 'fingerprint'].values[0])
+        new_topologicals.append(all_data_df.loc[all_data_df['SMILES'] == smile, 'topological'].values[0])
+        new_weights.append(all_data_df.loc[all_data_df['SMILES'] == smile, 'weight'].values[0])
+        new_heavy_atoms.append(all_data_df.loc[all_data_df['SMILES'] == smile, 'heavy_atom'].values[0])
+        new_types.append(list(set(AI_labeled_data_df.loc[AI_labeled_data_df['smile'] == smile, 'type'].values)))
+
     new_labeled_data_df = pd.DataFrame()
     new_labeled_data_df['cid'] = new_cids
-    new_labeled_data_df['smile'] = list(smiles)
     new_labeled_data_df['formula'] = new_formulas
+    new_labeled_data_df['smile'] = list(smiles)
+    new_labeled_data_df['fingerprint'] = new_fingerprints
+    new_labeled_data_df['topological'] = new_topologicals
+    new_labeled_data_df['weight'] = new_weights
+    new_labeled_data_df['heavy_atom'] = new_heavy_atoms
+    new_labeled_data_df['type'] = new_types
     new_labeled_data_df['label'] = new_labels
     new_labeled_data_df.to_csv('./data/labeled_data.csv', index=False)# save the labeled data for model training
 
@@ -242,16 +259,31 @@ def construct_unlabeled_data(labeled_data_df):
     cid_list = set(labeled_data_df['cid'].values.tolist())
     un_cids = []
     un_smiles = []
+    un_formulas = []
+    un_fingerprints = []
+    un_topologicals = []
+    un_weights = []
+    un_heavy_atoms = []
     for unlabeled_cid in tqdm(unlabeled_cid_list, desc='Constructing unlabeled data...'):
         if unlabeled_cid in cid_list:
             continue
 
         un_cids.append(unlabeled_cid)
         un_smiles.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'SMILES'].values[0])
+        un_formulas.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'formula'].values[0])
+        un_fingerprints.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'fingerprint'].values[0])
+        un_topologicals.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'topological'].values[0])
+        un_weights.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'weight'].values[0])
+        un_heavy_atoms.append(searching_space_df.loc[searching_space_df['cid'] == unlabeled_cid, 'heavy_atom'].values[0])
 
     unlabeled_data_df = pd.DataFrame()
     unlabeled_data_df['cid'] = un_cids
+    unlabeled_data_df['formula'] = un_formulas
     unlabeled_data_df['smiles'] = un_smiles
+    unlabeled_data_df['fingerprint'] = un_fingerprints
+    unlabeled_data_df['topological'] = un_topologicals
+    unlabeled_data_df['weight'] = un_weights
+    unlabeled_data_df['heavy_atom'] = un_heavy_atoms
     unlabeled_data_df.to_csv('./data/unlabeled_data.csv', index=False)# save the labeled data for model training
 
 preprocessed_papers_df = preprocess_papers_data()

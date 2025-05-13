@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
 # load the data
-label_data_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))# analysis the labeled data
-candidates_data_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/searching_space_data.csv'))# analysis the searching space data
+label_data_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))# analysis the labeled data
+candidates_data_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))# analysis the searching space data
 
 # how many different compounds 
 cid_count = len(set(label_data_df['cid'].values))
@@ -165,11 +165,13 @@ for cid in set(label_data_df['cid'].values):
     type_values = selected_df.loc[selected_df['cid'] == cid, 'type'].values
 
     for type_ in type_values:
-        if type_ == '-1':
-            print(cid, type_)
-            continue
-        elif ',' in type_:
+        print(type_)
+        type_ = type_.split('[')[1].split(']')[0]
+        
+        print(cid, type_)
+        if ',' in type_:
             type_value = type_.split(',')
+            print(cid, type_value)
             for type__ in type_value:
                 if cid not in types:
                     types[cid] = []
@@ -178,8 +180,9 @@ for cid in set(label_data_df['cid'].values):
             if cid not in types:
                 types[cid] = []
             types[cid].append(type_)
+        
 print('compounds have label ratio:', (len(types) / candidates_cid_count) * 100, '%')
-# hotspot_plot('frequently', label_data_df, types)
+hotspot_plot('frequently', label_data_df, types)
 # hotspot_plot('all', label_data_df, types)
 
 # analysis the literature ratio
