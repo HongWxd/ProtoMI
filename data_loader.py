@@ -52,13 +52,3 @@ class Dataset(Dataset):
         else:
             label = -1
         return idx, formula, smile, fingerprint, topological, weight, heavy_atom, label
-
-
-labeled_path = './data/labeled_data.csv'
-unlabeled_path = './data/unlabeled_data.csv'
-searching_space_path = './data/searching_space_data.csv'
-Dataset = Dataset(labeled_path, unlabeled_path, searching_space_path)
-graph_dict, mask_dict = Dataset.load_data()
-for graph, mask in zip(graph_dict, mask_dict):
-    print(graph, mask.values())
-

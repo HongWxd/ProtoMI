@@ -74,18 +74,6 @@ def get_bond_features(bond,
     return np.array(bond_feature_vector)
 
 def Graph_data_generator(x_smiles, y):
-    """
-    Inputs:
-    
-    x_smiles = [smiles_1, smiles_2, ....] ... a list of SMILES strings
-    y = [y_1, y_2, ...] ... a list of numerial labels for the SMILES strings (such as associated pKi values)
-    
-    Outputs:
-    
-    data_list = [G_1, G_2, ...] ... a list of torch_geometric.data.Data objects which represent labeled molecular graphs that can readily be used for machine learning
-    
-    """
-
     # convert SMILES to RDKit mol object
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
