@@ -10,6 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 # load the data
 label_data_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))# analysis the labeled data
+final_labeled_data_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
 candidates_data_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))# analysis the searching space data
 
 # how many different compounds 
@@ -84,8 +85,8 @@ def hotspot_plot(plot_type, label_data_df, types):
     type_hotspot = []
     labeled_keys = []
     for key, values in types.items():
-        libs, mibs, zibs, sibs, lmbs, others = 0,0,0,0,0,0
         values = set(values)
+        libs, mibs, zibs, sibs, lmbs, others = 0,0,0,0,0,0
         if len(values) == max_value:
             smile = label_data_df.loc[label_data_df['cid'] == key, 'smile'].values[0]
             type_df = label_data_df.loc[label_data_df['cid'] == key, 'type'].values
@@ -115,17 +116,18 @@ def hotspot_plot(plot_type, label_data_df, types):
                         continue
         else:
             continue
+
         sub_list = [libs, mibs, zibs, sibs, lmbs, others]
         labeled_keys.append(key)
         type_hotspot.append(sub_list)
-
-    # print(labeled_keys)
+    
     type_hotspot_df = pd.DataFrame(type_hotspot, columns=['LIB', 'MIB', 'ZIB', 'SIB', 'LMB', 'Other'])
     scaler = MinMaxScaler()
-    df_normalized = pd.DataFrame(scaler.fit_transform(type_hotspot_df), columns=type_hotspot_df.columns)
+    # df_normalized = pd.DataFrame(scaler.fit_transform(type_hotspot_df), columns=type_hotspot_df.columns)
+    df_normalized = type_hotspot_df
 
     if plot_type == 'frequently':
-        index = df_normalized[df_normalized > 0.3].stack().index
+        index = df_normalized[df_normalized > 0.2].stack().index
         index_list = []
         for i in index:
             i = i[0]
@@ -161,29 +163,23 @@ def hotspot_plot(plot_type, label_data_df, types):
 
 types = {}
 for cid in set(label_data_df['cid'].values):
-    selected_df = label_data_df[label_data_df['cid'] == cid]
+    selected_df = final_labeled_data_df[final_labeled_data_df['cid'] == cid]
     type_values = selected_df.loc[selected_df['cid'] == cid, 'type'].values
-
     for type_ in type_values:
-        print(type_)
-        type_ = type_.split('[')[1].split(']')[0]
-        
-        print(cid, type_)
         if ',' in type_:
-            type_value = type_.split(',')
-            print(cid, type_value)
-            for type__ in type_value:
+            sub_types = type_.split(', ')
+            for s_type in sub_types:
                 if cid not in types:
                     types[cid] = []
-                types[cid].append(type__)
+                types[cid].append(s_type)
         else:
             if cid not in types:
                 types[cid] = []
             types[cid].append(type_)
-        
+
 print('compounds have label ratio:', (len(types) / candidates_cid_count) * 100, '%')
-hotspot_plot('frequently', label_data_df, types)
-# hotspot_plot('all', label_data_df, types)
+# hotspot_plot('frequently', final_labeled_data_df, types)
+# hotspot_plot('all', final_labeled_data_df, types)
 
 # analysis the literature ratio
 

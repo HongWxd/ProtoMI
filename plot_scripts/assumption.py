@@ -33,9 +33,9 @@ warnings.filterwarnings('ignore')
 
 # Load the saved data
 # df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/searching_space_data.csv'))
-df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
+df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
 smiles_list = set(df['smile'].values.tolist())
-rep_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
+rep_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
 rep_smiles_list = set(rep_df['smile'].values.tolist())
 
 smiles = []
@@ -125,10 +125,10 @@ X_embedded = TSNE(n_components=2, learning_rate='auto',
 
 plt.figure()
 # colors = ["navy", "turquoise", "darkorange", "yellowgreen"]
-colors = ["darkorange", "yellowgreen", "turquoise"]
+colors = ["darkorange", "yellowgreen"]
 lw = 2
 # target_names = ['Li', 'Na', 'Li_Na', 'Other']
-target_names = ['SEI', 'no_SEI', 'Unreported']
+# target_names = ['SEI', 'no_SEI', 'Unreported']
 # target_names = ['SEI', 'no_SEI']
 target_names = ['SEI']
 
