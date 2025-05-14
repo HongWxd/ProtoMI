@@ -25,10 +25,9 @@ class Dataset(Dataset):
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
             _, _, smile, _, _, _, _, label = self.__getitem__(cid)
-            if smile == None:
-                continue # if RDKit package can not convert smile into mol, we will drop this compound
-
             x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, label) # edge_attr: (n_edges, n_edge_features)
+            if x == None:
+                continue # if RDKit package can not convert smile into mol, we will drop this compound
             graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             data_list.append(graph_data)
 
