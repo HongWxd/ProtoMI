@@ -304,7 +304,7 @@ preprocessed_patents_df = preprocess_patents_data()
 total_labeled_df = pd.concat([preprocessed_papers_df, preprocessed_patents_df], ignore_index=True)
 total_labeled_df = total_labeled_df[~((total_labeled_df['type'] == 'Other') & (total_labeled_df['label'] == '-1'))]
 total_labeled_df = total_labeled_df[~(total_labeled_df['type'] == '-1')]
-total_labeled_df.to_csv('./PubChem/processed_data/final_labeled_data.csv', index=False)# save the final labeled data
+# total_labeled_df.to_csv('./PubChem/processed_data/final_labeled_data.csv', index=False)# save the final labeled data
 
 # total_labeled_df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/final_labeled_data.csv'))
 labeled_data_df = construct_labeled_data(total_labeled_df)

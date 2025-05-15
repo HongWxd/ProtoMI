@@ -5,6 +5,7 @@ from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
 from torch_geometric.data import Data
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -110,7 +111,7 @@ def Graph_data_generator(x_smiles, y):
     EF = torch.tensor(EF, dtype = torch.float)
     
     # construct label tensor
-    y_tensor = torch.tensor(np.array([y]), dtype = torch.float)
+    y_tensor = torch.tensor(np.array([y]), dtype = torch.long)
     
     # construct Pytorch Geometric data object and append to data list
     x = X
@@ -124,19 +125,27 @@ def Graph_data_generator(x_smiles, y):
 
     return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
 
-# x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator('B1(OC(C(O1)(C)C)(C)C)C2=CC=NC=C2', 0)
-# graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, label = label, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
-# graph_dict = {}
-# graph_dict[111] = graph_data
-# nodes, edges, nodes_feature, edges_feature = 0, 0, 0, 0
-# for key, value in graph_dict.items():
-#     nodes += value.n_nodes
-#     edges += value.n_edges
-#     nodes_feature += value.n_node_features
-#     edges_feature += value.n_edge_features
-# print('nodes:', nodes)
-# print('edge:', edges)
-# print('nodes feature:', nodes_feature)
-# print('edges feature:', edges_feature)
-# print('degree:', 2 * edges)
-# print('avg degree:', 2 * edges / nodes)
+def plot_loss_acc(num_epochs, train_loss, test_accuracy):
+    epochs = list(range(1, num_epochs + 1))
+
+    plt.figure(figsize=(12, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, train_loss, marker='o', label='Train Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Curve')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, test_accuracy, marker='o', color='green', label='Validation Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Testing Accuracy Curve')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('./figs/loss_acc_curve.png', dpi=600)  # 可选保存为文件
+

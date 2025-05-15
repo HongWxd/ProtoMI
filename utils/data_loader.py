@@ -6,9 +6,8 @@ from torch_geometric.data import Data
 from utils.tools import Graph_data_generator
 from sklearn.model_selection import train_test_split
 
-
 class Dataset(Dataset):
-    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=False):
+    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True):
         self.labeled_data_df = pd.DataFrame(pd.read_csv(labeled_path))
         self.unlabeled_data_df = pd.DataFrame(pd.read_csv(unlabeled_path))
         self.searching_space_df = pd.DataFrame(pd.read_csv(searching_space_path))
@@ -20,7 +19,6 @@ class Dataset(Dataset):
         cids = self.searching_space_df['cid'].values.tolist()
         cids = [int(i) for i in cids]
 
-        mask_dict = {}
         data_list = []
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
@@ -28,14 +26,14 @@ class Dataset(Dataset):
             x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, label) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
-            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
-            data_list.append(graph_data)
 
             # get the mask for semi-supervised learning
             if cid in labeled_cid_list:
-                mask_dict[cid] = True
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             else:
-                mask_dict[cid] = False
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
+
+            data_list.append(graph_data)
         
         # split the dataset into train_data, val_data, and test_data
         train_dataset, val_dataset, test_dataset = self.data_split(data_list)
@@ -43,7 +41,7 @@ class Dataset(Dataset):
         if self.analysis:
             self.analysis_dataset(data_list)
 
-        return train_dataset, val_dataset, test_dataset, mask_dict
+        return train_dataset, val_dataset, test_dataset
     
     def data_split(self, data_list):
         train_data, test_data = train_test_split(data_list, test_size=0.2, random_state=42)
@@ -66,9 +64,13 @@ class Dataset(Dataset):
         print('edges feature:', edges_feature)
         print('number of degrees:', 2 * edges)
         print('avg degree:', 2 * edges / nodes)
+        print('label rate:', self.__len__('label') / self.__len__())
 
-    def __len__(self):
-        return len(self.unlabeled_data_df) + len(self.labeled_data_df)
+    def __len__(self, target='all'):
+        if target == 'label':
+            return len(self.labeled_data_df)
+        elif target == 'all':
+            return len(self.unlabeled_data_df) + len(self.labeled_data_df)
     
     def __getitem__(self, idx):
         formula = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'formula'].values[0])
