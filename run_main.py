@@ -154,10 +154,3 @@ print(f"Mean Accuracy: {mean_metrics[0]:.4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f}")
-
-
-
-
-
-
-
