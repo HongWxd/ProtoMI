@@ -6,9 +6,10 @@ from model import GCN
 from tqdm import tqdm
 import time
 import pickle
-from utils.tools import plot_loss_acc, train, evaluate
+from utils.tools import plot_loss_acc
 from sklearn.model_selection import KFold
 import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
@@ -18,9 +19,62 @@ parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning
 parser.add_argument('--hidden_channels', type=int, default=32, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=50, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
+parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 
 args = parser.parse_args()
+device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+
+def train(model, train_loader, device, optimizer, criterion):
+    model.train()
+    total_loss = 0
+    total_samples = 0
+    for data in train_loader:
+        if data.mask.sum() == 0:
+            continue
+
+        data = data.to(device)
+        optimizer.zero_grad()
+        out = model(data.x, data.edge_index, data.batch)
+
+        loss = criterion(out[data.mask], data.y[data.mask])
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        total_samples += int(data.mask.sum())
+    
+    return total_loss, total_samples
+
+def evaluate(model, loader, device, criterion):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    total_samples = 0
+    total_loss = 0
+    with torch.no_grad():
+        for data in loader:
+            if data.mask.sum() == 0:
+                continue
+
+            data = data.to(device)
+            out = model(data.x, data.edge_index, data.batch)
+            loss = criterion(out[data.mask], data.y[data.mask])
+
+            pred = out.argmax(dim=1)
+            all_preds.append(pred[data.mask].cpu())
+            all_labels.append(data.y[data.mask].cpu())
+            total_samples += int(data.mask.sum())
+            total_loss += loss.item()
+    
+    preds = torch.cat(all_preds).numpy()
+    labels = torch.cat(all_labels).numpy()
+
+    accuracy = accuracy_score(labels, preds)
+    precision = precision_score(labels, preds, average='binary')
+    recall = recall_score(labels, preds, average='binary')
+    f1 = f1_score(labels, preds, average='binary')
+
+    return accuracy, precision, recall, f1, total_samples, total_loss
 
 # with open('./data/train_data.pkl', 'rb') as f:
 #     train_data = pickle.load(f)
@@ -29,18 +83,14 @@ args = parser.parse_args()
 # with open('./data/test_data.pkl', 'rb') as f:
 #     test_data = pickle.load(f)
 
-# train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-# val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
-# test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
-
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
+best_test_acc = 0
 all_metrics = []
 all_loss_metrics = []
+best_model_state_dict = None
 kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
-device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
-
 for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     print(f'\n===== Fold {fold+1} =====')
     train_data = [all_data[i] for i in train_idx]
@@ -59,11 +109,9 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     total_loss = []
     total_test_loss = []
     total_test_acc = []
-    best_test_acc = 0
     best_test_precision = 0
     best_test_recall = 0
     best_test_f1 = 0
-    best_model_state_dict = None 
     train_start_time = time.time()
 
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
@@ -74,28 +122,30 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
         end_time = time.time()
         epoch_time = end_time - start_time
 
-        total_loss.append(total_train_loss)
-        total_test_loss.append(test_loss)
-        total_test_acc.append(test_accuracy)
-
         if test_accuracy > best_test_acc:
             best_test_acc = test_accuracy
             best_test_precision = test_precision
             best_test_recall = test_recall
             best_test_f1 = test_f1
             best_model_state_dict = model.state_dict()
+        
+        avg_train_loss = total_train_loss / train_samples
+        avg_test_loss = test_loss / test_samples
+        total_loss.append(avg_train_loss)
+        total_test_loss.append(avg_test_loss)
+        total_test_acc.append(test_accuracy)
 
-        print(f'Epoch: {epoch} | Epoch Time: {epoch_time:.4f} | Train Loss: {total_train_loss / train_samples:.4f} | Test Loss: {test_loss / test_samples:.4f}')
-        print(f'Train Acc: {train_accuracy:.4f} | Train Precision: {train_precision:.4f} | Train Recall: {train_recall:.4f} | Train F1: {train_f1:.4f} | Train Labeled Samples: {train_samples}')
-        print(f'Test Acc: {test_accuracy:.4f} | Test Precision: {test_precision:.4f} | Test Recall: {test_recall:.4f} | Test F1: {test_f1:.4f} | Test Labeled Samples: {test_samples}')
+        print(f'Epoch: {epoch} | Epoch Time: {epoch_time:.4f} | Train Loss: {avg_train_loss:.4f} | Test Loss: {avg_test_loss:.4f}')
+        print(f'Train Acc: {train_accuracy:.4f} | Train Precision: {train_precision:.4f} | Train Recall: {train_recall:.4f} | Train F1: {train_f1:.4f}')
+        print(f'Test Acc: {test_accuracy:.4f} | Test Precision: {test_precision:.4f} | Test Recall: {test_recall:.4f} | Test F1: {test_f1:.4f}')
 
     train_end_time = time.time()
-    print(f'Best Performance: Test Acc: {best_test_acc:.4f} | Test Precision: {best_test_precision:.4f} | Test Recall: {best_test_recall:.4f} | Test F1: {best_test_f1:.4f} | Total Train Time: {(train_end_time - train_start_time):.4f} ')
+    print(f'Best Performance for fold {fold}: Test Acc: {best_test_acc:.4f} | Test Precision: {best_test_precision:.4f} | Test Recall: {best_test_recall:.4f} | Test F1: {best_test_f1:.4f} | Total Train Time: {(train_end_time - train_start_time):.4f} ')
     # if best_model_state_dict is not None:
     #     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
     best_metrics = (best_test_acc, best_test_precision, best_test_recall, best_test_f1)
     all_metrics.append(best_metrics)
-    plot_loss_acc(args.epoch, total_loss, train_samples, total_test_loss, test_samples, total_test_acc, fold)# plot loss and acc figure
+    plot_loss_acc(args.epoch, total_loss, total_test_loss, total_test_acc, fold)# plot loss and acc figure
 
 all_metrics = np.array(all_metrics)
 mean_metrics = all_metrics.mean(axis=0)

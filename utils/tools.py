@@ -6,7 +6,7 @@ import torch
 from torch_geometric.data import Data
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -21,7 +21,7 @@ def one_hot_encoding(x, permitted_list):
 
     return binary_encoding
 
-def get_atom_features(atom, 
+def get_atom_features(atom, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std,
                       use_chirality = True, 
                       hydrogens_implicit = True):
     """
@@ -36,14 +36,14 @@ def get_atom_features(atom,
     
     # compute atom features
     atom_type_enc = one_hot_encoding(str(atom.GetSymbol()), permitted_list_of_atoms)
-    n_heavy_neighbors_enc = one_hot_encoding(int(atom.GetDegree()), [0, 1, 2, 3, 4, "MoreThanFour"])
+    n_heavy_neighbors_enc = one_hot_encoding(int(atom.GetDegree()), range(2, 61))
     formal_charge_enc = one_hot_encoding(int(atom.GetFormalCharge()), [-3, -2, -1, 0, 1, 2, 3, "Extreme"])
     hybridisation_type_enc = one_hot_encoding(str(atom.GetHybridization()), ["S", "SP", "SP2", "SP3", "SP3D", "SP3D2", "OTHER"])
     is_in_a_ring_enc = [int(atom.IsInRing())]
     is_aromatic_enc = [int(atom.GetIsAromatic())]
-    atomic_mass_scaled = [float((atom.GetMass() - 10.812)/116.092)]
-    vdw_radius_scaled = [float((Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum()) - 1.5)/0.6)]
-    covalent_radius_scaled = [float((Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum()) - 0.64)/0.76)]
+    atomic_mass_scaled = [float((atom.GetMass() - mass_mean)/mass_std)]
+    vdw_radius_scaled = [float((Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum()) - vdw_mean)/vdw_std)]
+    covalent_radius_scaled = [float((Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum()) - covalent_mean)/covalent_std)]
     atom_feature_vector = atom_type_enc + n_heavy_neighbors_enc + formal_charge_enc + hybridisation_type_enc + is_in_a_ring_enc + is_aromatic_enc + atomic_mass_scaled + vdw_radius_scaled + covalent_radius_scaled
                                     
     if use_chirality == True:
@@ -74,7 +74,7 @@ def get_bond_features(bond,
 
     return np.array(bond_feature_vector)
 
-def Graph_data_generator(x_smiles, y):
+def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
@@ -85,7 +85,7 @@ def Graph_data_generator(x_smiles, y):
     n_edges = 2*mol.GetNumBonds()
     unrelated_smiles = "O=O"
     unrelated_mol = Chem.MolFromSmiles(unrelated_smiles)
-    n_node_features = len(get_atom_features(unrelated_mol.GetAtomWithIdx(0)))
+    n_node_features = len(get_atom_features(unrelated_mol.GetAtomWithIdx(0), mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std))
     n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
     # print(smiles, n_nodes, n_edges, unrelated_smiles, unrelated_mol, n_node_features, n_edge_features)
 
@@ -93,7 +93,7 @@ def Graph_data_generator(x_smiles, y):
     X = np.zeros((n_nodes, n_node_features))
 
     for atom in mol.GetAtoms():
-        X[atom.GetIdx(), :] = get_atom_features(atom)
+        X[atom.GetIdx(), :] = get_atom_features(atom, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std)
         
     X = torch.tensor(X, dtype = torch.float)
     
@@ -109,7 +109,7 @@ def Graph_data_generator(x_smiles, y):
     for (k, (i,j)) in enumerate(zip(rows, cols)):
         EF[k] = get_bond_features(mol.GetBondBetweenAtoms(int(i),int(j)))
     
-    EF = torch.tensor(EF, dtype = torch.float)
+    EF = torch.tensor(EF, dtype = torch.long)
     
     # construct label tensor
     y_tensor = torch.tensor(np.array([y]), dtype = torch.long)
@@ -126,14 +126,30 @@ def Graph_data_generator(x_smiles, y):
 
     return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
 
-def plot_loss_acc(num_epochs, train_loss, train_samples, total_test_loss, test_samples, test_accuracy, fold):
+def get_statistical_values(x_smiles):
+    mol = Chem.MolFromSmiles(x_smiles)
+    if mol == None:
+        return None, None, None
+
+    all_masses = []
+    all_vdw = []
+    all_covalent = []
+    for atom in mol.GetAtoms():
+        all_masses.append(float(atom.GetMass()))
+        all_vdw.append(float(Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum())))
+        all_covalent.append(float(Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum())))
+
+    return all_masses, all_vdw, all_covalent
+    
+
+def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
     epochs = list(range(1, num_epochs + 1))
 
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_loss / train_samples, marker='o', label='Train Loss')
-    plt.plot(epochs, total_test_loss / test_samples, marker='o', label='Test Loss')
+    plt.plot(epochs, train_loss, marker='o', label='Train Loss')
+    plt.plot(epochs, total_test_loss, marker='o', label='Test Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Loss Curve')
@@ -151,54 +167,4 @@ def plot_loss_acc(num_epochs, train_loss, train_samples, total_test_loss, test_s
     plt.tight_layout()
     plt.savefig(f'./figs/fold_{fold+1}_loss_acc_curve.png', dpi=600)
 
-def train(model, train_loader, device, optimizer, criterion):
-    model.train()
-    total_loss = 0
-    total_samples = 0
-    for data in train_loader:
-        if data.mask.sum() == 0:
-            continue
 
-        data = data.to(device)
-        optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.batch)
-
-        loss = criterion(out[data.mask], data.y[data.mask])
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        total_samples += int(data.mask.sum())
-    
-    return total_loss, total_samples
-
-def evaluate(model, loader, device, criterion):
-    model.eval()
-    all_preds = []
-    all_labels = []
-    total_samples = 0
-    total_loss = 0
-    with torch.no_grad():
-        for data in loader:
-            if data.mask.sum() == 0:
-                continue
-
-            data = data.to(device)
-            out = model(data.x, data.edge_index, data.batch)
-            loss = criterion(out[data.mask], data.y[data.mask])
-
-            pred = out.argmax(dim=1)
-            all_preds.append(pred[data.mask].cpu())
-            all_labels.append(data.y[data.mask].cpu())
-            total_samples += int(data.mask.sum())
-            total_loss += loss.item()
-    
-    preds = torch.cat(all_preds).numpy()
-    labels = torch.cat(all_labels).numpy()
-
-    accuracy = accuracy_score(labels, preds)
-    precision = precision_score(labels, preds, average='binary')
-    recall = recall_score(labels, preds, average='binary')
-    f1 = f1_score(labels, preds, average='binary')
-
-    return accuracy, precision, recall, f1, total_samples, total_loss

@@ -3,11 +3,14 @@ import pandas as pd
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
-from utils.tools import Graph_data_generator
+from utils.tools import Graph_data_generator, get_statistical_values
 from sklearn.model_selection import train_test_split
+from rdkit import Chem
+import numpy as np
+import warnings
 
 class Dataset(Dataset):
-    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=False):
+    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=True):
         self.labeled_data_df = pd.DataFrame(pd.read_csv(labeled_path))
         self.unlabeled_data_df = pd.DataFrame(pd.read_csv(unlabeled_path))
         self.searching_space_df = pd.DataFrame(pd.read_csv(searching_space_path))
@@ -17,14 +20,16 @@ class Dataset(Dataset):
 
     def load_data(self):
         labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
-        cids = self.searching_space_df['cid'].values.tolist()
+        cids = list(set(self.searching_space_df['cid'].values))
         cids = [int(i) for i in cids]
+
+        mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std = self.get_mean_std_values(cids)
 
         data_list = []
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
             _, _, smile, _, _, _, _, label = self.__getitem__(cid)
-            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, label) # edge_attr: (n_edges, n_edge_features)
+            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, label, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
 
@@ -33,7 +38,7 @@ class Dataset(Dataset):
                 graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             else:
                 graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
-
+            
             data_list.append(graph_data)
 
         if self.analysis:
@@ -45,6 +50,26 @@ class Dataset(Dataset):
         else:
             train_dataset, val_dataset, test_dataset = self.data_split(data_list)
             return train_dataset, val_dataset, test_dataset
+
+    def __len__(self, target='all'):
+        if target == 'label':
+            return len(self.labeled_data_df)
+        elif target == 'all':
+            return len(self.unlabeled_data_df) + len(self.labeled_data_df)
+    
+    def __getitem__(self, idx):
+        formula = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'formula'].values[0])
+        smile = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'SMILES'].values[0])
+        fingerprint = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'fingerprint'].values[0])
+        topological = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'topological'].values[0])
+        weight = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'weight'].values[0])
+        heavy_atom = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'heavy_atom'].values[0])
+        labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
+        if idx in labeled_cid_list:
+            label = self.labeled_data_df.loc[self.labeled_data_df['cid'] == idx, 'label'].values[0]
+        else:
+            label = -1
+        return idx, formula, smile, fingerprint, topological, weight, heavy_atom, label
     
     def data_split(self, data_list):
         train_data, test_data = train_test_split(data_list, test_size=0.2, random_state=42)
@@ -68,23 +93,23 @@ class Dataset(Dataset):
         print('number of degrees:', 2 * edges)
         print('avg degree:', 2 * edges / nodes)
         print('label rate:', self.__len__('label') / self.__len__())
-
-    def __len__(self, target='all'):
-        if target == 'label':
-            return len(self.labeled_data_df)
-        elif target == 'all':
-            return len(self.unlabeled_data_df) + len(self.labeled_data_df)
     
-    def __getitem__(self, idx):
-        formula = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'formula'].values[0])
-        smile = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'SMILES'].values[0])
-        fingerprint = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'fingerprint'].values[0])
-        topological = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'topological'].values[0])
-        weight = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'weight'].values[0])
-        heavy_atom = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'heavy_atom'].values[0])
-        labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
-        if idx in labeled_cid_list:
-            label = self.labeled_data_df.loc[self.labeled_data_df['cid'] == idx, 'label'].values[0]
-        else:
-            label = -1
-        return idx, formula, smile, fingerprint, topological, weight, heavy_atom, label
+    def get_mean_std_values(self, cids):
+        total_all_masses = []
+        total_all_vdw = []
+        total_all_covalent = []
+        for cid in tqdm(cids, desc='Get some statistical values of data'):
+            _, _, smile, _, _, _, _,_ = self.__getitem__(cid)
+            all_masses, all_vdw, all_covalent = get_statistical_values(smile)
+            if all_masses == None:
+                continue
+
+            total_all_masses.append(all_masses)
+            total_all_vdw.append(all_vdw)
+            total_all_covalent.append(all_covalent)
+        
+        mass_mean, mass_std = np.mean(all_masses), np.std(all_masses)
+        vdw_mean, vdw_std = np.mean(all_vdw), np.std(all_vdw)
+        covalent_mean, covalent_std = np.mean(all_covalent), np.std(all_covalent)
+
+        return mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std
