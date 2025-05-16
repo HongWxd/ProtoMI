@@ -6,6 +6,7 @@ import torch
 from torch_geometric.data import Data
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -125,21 +126,22 @@ def Graph_data_generator(x_smiles, y):
 
     return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
 
-def plot_loss_acc(num_epochs, train_loss, test_accuracy):
+def plot_loss_acc(num_epochs, train_loss, train_samples, total_test_loss, test_samples, test_accuracy, fold):
     epochs = list(range(1, num_epochs + 1))
 
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_loss, marker='o', label='Train Loss')
+    plt.plot(epochs, train_loss / train_samples, marker='o', label='Train Loss')
+    plt.plot(epochs, total_test_loss / test_samples, marker='o', label='Test Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training Loss Curve')
+    plt.title('Loss Curve')
     plt.grid(True)
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, test_accuracy, marker='o', color='green', label='Validation Accuracy')
+    plt.plot(epochs, test_accuracy, marker='o', color='gray', label='Testing Accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Testing Accuracy Curve')
@@ -147,5 +149,56 @@ def plot_loss_acc(num_epochs, train_loss, test_accuracy):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig('./figs/loss_acc_curve.png', dpi=600)  # 可选保存为文件
+    plt.savefig(f'./figs/fold_{fold+1}_loss_acc_curve.png', dpi=600)
 
+def train(model, train_loader, device, optimizer, criterion):
+    model.train()
+    total_loss = 0
+    total_samples = 0
+    for data in train_loader:
+        if data.mask.sum() == 0:
+            continue
+
+        data = data.to(device)
+        optimizer.zero_grad()
+        out = model(data.x, data.edge_index, data.batch)
+
+        loss = criterion(out[data.mask], data.y[data.mask])
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        total_samples += int(data.mask.sum())
+    
+    return total_loss, total_samples
+
+def evaluate(model, loader, device, criterion):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    total_samples = 0
+    total_loss = 0
+    with torch.no_grad():
+        for data in loader:
+            if data.mask.sum() == 0:
+                continue
+
+            data = data.to(device)
+            out = model(data.x, data.edge_index, data.batch)
+            loss = criterion(out[data.mask], data.y[data.mask])
+
+            pred = out.argmax(dim=1)
+            all_preds.append(pred[data.mask].cpu())
+            all_labels.append(data.y[data.mask].cpu())
+            total_samples += int(data.mask.sum())
+            total_loss += loss.item()
+    
+    preds = torch.cat(all_preds).numpy()
+    labels = torch.cat(all_labels).numpy()
+
+    accuracy = accuracy_score(labels, preds)
+    precision = precision_score(labels, preds, average='binary')
+    recall = recall_score(labels, preds, average='binary')
+    f1 = f1_score(labels, preds, average='binary')
+
+    return accuracy, precision, recall, f1, total_samples, total_loss

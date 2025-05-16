@@ -7,12 +7,13 @@ from utils.tools import Graph_data_generator
 from sklearn.model_selection import train_test_split
 
 class Dataset(Dataset):
-    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True):
+    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=False):
         self.labeled_data_df = pd.DataFrame(pd.read_csv(labeled_path))
         self.unlabeled_data_df = pd.DataFrame(pd.read_csv(unlabeled_path))
         self.searching_space_df = pd.DataFrame(pd.read_csv(searching_space_path))
 
         self.analysis = analysis
+        self.cross_validate = cross_validate
 
     def load_data(self):
         labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
@@ -34,14 +35,16 @@ class Dataset(Dataset):
                 graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
 
             data_list.append(graph_data)
-        
-        # split the dataset into train_data, val_data, and test_data
-        train_dataset, val_dataset, test_dataset = self.data_split(data_list)
 
         if self.analysis:
             self.analysis_dataset(data_list)
-
-        return train_dataset, val_dataset, test_dataset
+        
+        # split the dataset into train_data, val_data, and test_data
+        if self.cross_validate:
+            return data_list
+        else:
+            train_dataset, val_dataset, test_dataset = self.data_split(data_list)
+            return train_dataset, val_dataset, test_dataset
     
     def data_split(self, data_list):
         train_data, test_data = train_test_split(data_list, test_size=0.2, random_state=42)
