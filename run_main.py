@@ -134,8 +134,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 
     train_end_time = time.time()
     print(f'Best Performance for fold {fold}: Test Acc: {best_test_acc:.4f} | Test Precision: {best_test_precision:.4f} | Test Recall: {best_test_recall:.4f} | Test F1: {best_test_f1:.4f} | Total Train Time: {(train_end_time - train_start_time):.4f} ')
-    # if best_model_state_dict is not None:
-    #     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
+
     best_metrics = (best_test_acc, best_test_precision, best_test_recall, best_test_f1)
     all_metrics.append(best_metrics)
     plot_loss_acc(args.epoch, total_loss, total_test_loss, total_test_acc, fold)# plot loss and acc figure
@@ -147,3 +146,6 @@ print(f"Mean Accuracy: {mean_metrics[0]:.4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f}")
+
+if best_model_state_dict is not None:
+    torch.save(best_model_state_dict, './checkpoints/best_model.pth')
