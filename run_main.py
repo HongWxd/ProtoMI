@@ -76,13 +76,6 @@ def evaluate(model, loader, device, criterion):
 
     return accuracy, precision, recall, f1, total_samples, total_loss
 
-# with open('./data/train_data.pkl', 'rb') as f:
-#     train_data = pickle.load(f)
-# with open('./data/val_data.pkl', 'rb') as f:
-#     val_data = pickle.load(f)
-# with open('./data/test_data.pkl', 'rb') as f:
-#     test_data = pickle.load(f)
-
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
