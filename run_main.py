@@ -16,8 +16,8 @@ parser.add_argument('--analysis', type=bool, default=False, help='Wether to prin
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
-parser.add_argument('--hidden_channels', type=int, default=32, help='Number of hidden channels')
-parser.add_argument('--epoch', type=int, default=50, help='Number of training epochs')
+parser.add_argument('--hidden_channels', type=int, default=64, help='Number of hidden channels')
+parser.add_argument('--epoch', type=int, default=100, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 
@@ -105,6 +105,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     best_test_precision = 0
     best_test_recall = 0
     best_test_f1 = 0
+    best_fold = 0
     train_start_time = time.time()
 
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
@@ -120,6 +121,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
             best_test_precision = test_precision
             best_test_recall = test_recall
             best_test_f1 = test_f1
+            best_fold = fold + 1
             best_model_state_dict = model.state_dict()
         
         avg_train_loss = total_train_loss / train_samples
