@@ -80,6 +80,7 @@ with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 best_test_acc = 0
+best_fold = 0
 all_metrics = []
 all_loss_metrics = []
 best_model_state_dict = None
@@ -105,7 +106,6 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     best_test_precision = 0
     best_test_recall = 0
     best_test_f1 = 0
-    best_fold = 0
     train_start_time = time.time()
 
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
@@ -148,6 +148,7 @@ print(f"Mean Accuracy: {mean_metrics[0]:.4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f}")
+print(f'Best fold: {best_fold}')
 
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
