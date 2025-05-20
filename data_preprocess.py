@@ -1,5 +1,5 @@
 import pickle
-from utils.data_loader import Dataset
+from utils.data_loader import MoleculeDataset
 
 # paths
 labeled_path = './data/labeled_data.csv'
@@ -11,13 +11,15 @@ test_data_path = './data/test_data.pkl'
 all_data_path = './data/all_data.pkl'
 
 # load the dataset
-Dataset = Dataset(labeled_path, unlabeled_path, searching_space_path)
-all_data = Dataset.load_data()
+dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path)
+labeled_data_list = dataset.save_labeled_data()
+with open('./data/labeled_data.pkl', 'wb') as f:
+    pickle.dump(labeled_data_list, f)
 
 # save the train, val, test data
-with open(all_data_path, 'wb') as f:
-    pickle.dump(all_data, f)
-print(f'all_data is saved at: {all_data_path}')
+# with open(all_data_path, 'wb') as f:
+#     pickle.dump(all_data, f)
+# print(f'all_data is saved at: {all_data_path}')
 
 # with open(train_data_path, 'wb') as f:
 #     pickle.dump(train_data, f)
@@ -30,5 +32,3 @@ print(f'all_data is saved at: {all_data_path}')
 # with open(test_data_path, 'wb') as f:
 #     pickle.dump(test_data, f)
 # print(f'test_data is saved at: {test_data_path}')
-
-

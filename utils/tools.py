@@ -4,8 +4,9 @@ from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
 from torch_geometric.data import Data
-from tqdm import tqdm
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+import matplotlib.animation as animation
 
 
 def one_hot_encoding(x, permitted_list):
@@ -36,7 +37,7 @@ def get_atom_features(atom, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mea
     
     # compute atom features
     atom_type_enc = one_hot_encoding(str(atom.GetSymbol()), permitted_list_of_atoms)
-    n_heavy_neighbors_enc = one_hot_encoding(int(atom.GetDegree()), range(2, 61))
+    n_heavy_neighbors_enc = one_hot_encoding(int(atom.GetDegree()), [0, 1, 2, 3, 4, "MoreThanFour"])
     formal_charge_enc = one_hot_encoding(int(atom.GetFormalCharge()), [-3, -2, -1, 0, 1, 2, 3, "Extreme"])
     hybridisation_type_enc = one_hot_encoding(str(atom.GetHybridization()), ["S", "SP", "SP2", "SP3", "SP3D", "SP3D2", "OTHER"])
     is_in_a_ring_enc = [int(atom.IsInRing())]
@@ -167,4 +168,23 @@ def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
     plt.tight_layout()
     plt.savefig(f'./figs/fold_{fold+1}_loss_acc_curve.png', dpi=600)
 
+def visualize_embedding_evolution(embedding_snapshots, record_epochs, save_path="./figs/embedding_over_time.gif", fps=10):
+    fig, ax = plt.subplots(figsize=(6, 6))
 
+    def update(frame_idx):
+        ax.clear()
+        embeddings, labels, masks = embedding_snapshots[frame_idx]
+        embeddings = embeddings[masks]
+        labels = labels[masks]
+
+        tsne = TSNE(n_components=2, random_state=42)
+        emb_2d = tsne.fit_transform(embeddings.numpy())
+
+        scatter = ax.scatter(emb_2d[:, 0], emb_2d[:, 1], c=labels.numpy(), cmap='tab10', s=30)
+        ax.set_title(f"Epoch {record_epochs[frame_idx]}")
+        ax.axis('off')
+        return scatter,
+
+    ani = animation.FuncAnimation(fig, update, frames=len(embedding_snapshots), interval=1000 // fps)
+    ani.save(save_path, writer='pillow', fps=fps)
+    print(f"Saved animation to {save_path}")

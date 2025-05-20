@@ -8,6 +8,9 @@ class GCN(torch.nn.Module):
         super(GCN, self).__init__()
         self.conv1 = GCNConv(num_node_features, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        self.conv3 = GCNConv(hidden_channels, hidden_channels)
+        self.conv4 = GCNConv(hidden_channels, hidden_channels)
+        self.conv5 = GCNConv(hidden_channels, hidden_channels)
         self.lin = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
@@ -17,6 +20,18 @@ class GCN(torch.nn.Module):
         x = self.dropout(x)
 
         x = self.conv2(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv3(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv4(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv5(x, edge_index)
         x = F.relu(x)
         x = self.dropout(x)
 
