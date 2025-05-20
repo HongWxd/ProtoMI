@@ -60,7 +60,7 @@ class MoleculeDataset(Dataset):
         if idx in labeled_cid_list:
             label = self.labeled_data_df.loc[self.labeled_data_df['cid'] == idx, 'label'].values[0]
         else:
-            label = -1
+            label = 2
         return idx, formula, smile, fingerprint, topological, weight, heavy_atom, label
     
     def data_split(self, data_list):
@@ -109,7 +109,7 @@ class MoleculeDataset(Dataset):
     def save_labeled_data(self):
         labeled_data_list = []
         for data in self.data:
-            if data.y != -1:
+            if data.y != 2:
                 labeled_data_list.append(data)
         
         return labeled_data_list

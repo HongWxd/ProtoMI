@@ -12,9 +12,9 @@ all_data_path = './data/all_data.pkl'
 
 # load the dataset
 dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path)
-labeled_data_list = dataset.save_labeled_data()
-with open('./data/labeled_data.pkl', 'wb') as f:
-    pickle.dump(labeled_data_list, f)
+# labeled_data_list = dataset.save_labeled_data()
+# with open('./data/labeled_data.pkl', 'wb') as f:
+#     pickle.dump(labeled_data_list, f)
 
 # save the train, val, test data
 with open(all_data_path, 'wb') as f:

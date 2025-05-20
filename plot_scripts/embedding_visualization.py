@@ -1,200 +1,121 @@
 import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
-import matplotlib.animation as animation
+from sklearn.decomposition import PCA
 import torch
 import argparse
-import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN
 from tqdm import tqdm
-import time
 import pickle
-from utils.tools import plot_loss_acc
-from sklearn.model_selection import KFold
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import torch.nn.functional as F
+import torch
+from torch.nn import Linear, Dropout
+from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool
+from sklearn.model_selection import train_test_split
+import imageio.v2 as imageio
+import os
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
-parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
+parser.add_argument('--num_classes', type=int, default=3, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=64, help='Number of hidden channels')
-parser.add_argument('--epoch', type=int, default=150, help='Number of training epochs')
+parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
+parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
-
-
-def visualize_embedding_evolution(embedding_snapshots, record_epochs, save_path="./figs/embedding_over_time.gif", fps=10):
-    fig, ax = plt.subplots(figsize=(6, 6))
-
-    def update(frame_idx):
-        ax.clear()
-        embeddings, labels, masks = embedding_snapshots[frame_idx]
-        embeddings = embeddings[masks]
-        labels = labels[masks]
-
-        tsne = TSNE(n_components=2, random_state=42)
-        emb_2d = tsne.fit_transform(embeddings.numpy())
-
-        scatter = ax.scatter(emb_2d[:, 0], emb_2d[:, 1], c=labels.numpy(), cmap='tab10', s=30)
-        ax.set_title(f"Epoch {record_epochs[frame_idx]}")
-        ax.axis('off')
-        return scatter,
-
-    ani = animation.FuncAnimation(fig, update, frames=len(embedding_snapshots), interval=1000 // fps)
-    ani.save(save_path, writer='pillow', fps=fps)
-    print(f"Saved animation to {save_path}")
-
 
 args = parser.parse_args()
 device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 
-def train(model, train_loader, device, optimizer, criterion):
-    model.train()
-    total_loss = 0
-    total_samples = 0
+class GCN(torch.nn.Module):
+    def __init__(self, num_node_features, hidden_channels, num_classes, dropout):
+        super(GCN, self).__init__()
+        self.conv1 = GCNConv(num_node_features, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        self.lin = Linear(hidden_channels, num_classes)
+        self.dropout = Dropout(dropout)
 
-    for data in train_loader:
-        if data.mask.sum() == 0:
-            continue
+    def forward(self, x, edge_index, batch):
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
 
-        data = data.to(device)
-        optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.batch)
+        x = self.conv2(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
 
-        loss = criterion(out[data.mask], data.y[data.mask])
-        loss.backward()
-        optimizer.step()
+        x = global_mean_pool(x, batch)
 
-        total_loss += loss.item()
-        total_samples += int(data.mask.sum())
-    
-    return total_loss, total_samples
+        x = self.lin(x)
+        return x
 
-def evaluate(model, loader, device, criterion):
+def visualize_embeddings(model, dataloader, epoch):
     model.eval()
-    all_preds = []
+    all_embeds = []
     all_labels = []
-    total_samples = 0
-    total_loss = 0
     with torch.no_grad():
-        for data in loader:
-            if data.mask.sum() == 0:
-                continue
-
+        for data in dataloader:
             data = data.to(device)
-            out = model(data.x, data.edge_index, data.batch)
-            loss = criterion(out[data.mask], data.y[data.mask])
+            embeds = model(data.x, data.edge_index, data.batch)
+            all_embeds.append(embeds.cpu())
+            all_labels.append(data.y.cpu())
 
-            pred = out.argmax(dim=1)
-            all_preds.append(pred[data.mask].cpu())
-            all_labels.append(data.y[data.mask].cpu())
-            total_samples += int(data.mask.sum())
-            total_loss += loss.item()
-    
-    preds = torch.cat(all_preds).numpy()
-    labels = torch.cat(all_labels).numpy()
+    embeds = torch.cat(all_embeds, dim=0).numpy()
+    labels = torch.cat(all_labels, dim=0).numpy()
 
-    accuracy = accuracy_score(labels, preds)
-    precision = precision_score(labels, preds, average='binary')
-    recall = recall_score(labels, preds, average='binary')
-    f1 = f1_score(labels, preds, average='binary')
+    reducer = PCA(n_components=2)
+    embeds_2d = reducer.fit_transform(embeds)
 
-    return accuracy, precision, recall, f1, total_samples, total_loss
+    plt.figure(figsize=(6, 6))
+    num_classes = len(np.unique(labels))
+
+    for i in range(num_classes):
+        idx = labels == i
+        plt.scatter(embeds_2d[idx, 0], embeds_2d[idx, 1], label=f'Class {i}', alpha=0.7, s=20)
+
+    plt.legend()
+    plt.title(f'Graph Embedding at Epoch {epoch}')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f'./figs/embedding_evol/embed_epoch_{epoch:03d}.png')
+    plt.close()
 
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
+train_data, test_data = train_test_split(all_data, test_size=0.2, random_state=42, shuffle=True)
 
-best_fold = 0
-overall_best_acc = 0
-all_metrics = []
-all_loss_metrics = []
-best_model_state_dict = None
-kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
-for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
-    print(f'\n===== Fold {fold+1} =====')
-    train_data = [all_data[i] for i in train_idx]
-    test_data = [all_data[i] for i in test_idx]
+train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
+model = GCN(num_node_features=train_data[0].n_node_features,
+        hidden_channels=args.hidden_channels,
+        num_classes=args.num_classes, dropout=args.dropout).to(device)
 
-    model = GCN(num_node_features=train_data[0].n_node_features,
-            hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout).to(device)
-    print(model)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
+criterion = torch.nn.CrossEntropyLoss()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
-    criterion = torch.nn.CrossEntropyLoss()
+embeddings_over_time = []
+for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
+    model.train()
 
-    total_loss = []
-    total_test_loss = []
-    total_test_acc = []
-    embedding_snapshots = []
-    best_test_acc = 0
-    best_test_precision = 0
-    best_test_recall = 0
-    best_test_f1 = 0
-    early_stop_counter = 0 # early stopping varient
-    pratical_epoch = 0
-    train_start_time = time.time()
+    for data in train_loader:
+        data = data.to(device)
+        optimizer.zero_grad()
+        out = model(data.x, data.edge_index, data.batch)
 
-    for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
-        start_time = time.time()
-        total_train_loss, train_samples = train(model, train_loader, device, optimizer, criterion)
-        train_accuracy, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device, criterion)
-        test_accuracy, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device, criterion)
-        end_time = time.time()
-        epoch_time = end_time - start_time
+        loss = criterion(out, data.y)
+        loss.backward()
+        optimizer.step()
 
-        if test_accuracy >= best_test_acc:
-            early_stop_counter = 0
-            best_test_acc = test_accuracy
-            best_test_precision = test_precision
-            best_test_recall = test_recall
-            best_test_f1 = test_f1
-            if test_accuracy > overall_best_acc:
-                overall_best_acc = test_accuracy
-                best_model_state_dict = model.state_dict()
-                best_fold = fold + 1
-        else:
-            early_stop_counter += 1
-            print(f"Early stop counter: {early_stop_counter} / {args.patience}")
-            if early_stop_counter >= args.patience:
-                print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
-                pratical_epoch = epoch - 1
-                break  # stop training early
-        
-        avg_train_loss = total_train_loss / train_samples
-        avg_test_loss = test_loss / test_samples
-        total_loss.append(avg_train_loss)
-        total_test_loss.append(avg_test_loss)
-        total_test_acc.append(test_accuracy)
+    visualize_embeddings(model, train_loader, epoch)
 
-        print(f'Epoch: {epoch} | Epoch Time: {epoch_time:.4f} | Train Loss: {avg_train_loss:.4f} | Test Loss: {avg_test_loss:.4f}')
-        print(f'Train Acc: {train_accuracy:.4f} | Train Precision: {train_precision:.4f} | Train Recall: {train_recall:.4f} | Train F1: {train_f1:.4f}')
-        print(f'Test Acc: {test_accuracy:.4f} | Test Precision: {test_precision:.4f} | Test Recall: {test_recall:.4f} | Test F1: {test_f1:.4f}')
+def make_gif(image_folder, output_path='./figs/embedding_evolution.gif'):
+    images = []
+    for epoch in sorted(os.listdir(image_folder)):
+        if epoch.endswith('.png'):
+            images.append(imageio.imread(os.path.join(image_folder, epoch)))
+    imageio.mimsave(output_path, images, duration=0.4)
 
-    train_end_time = time.time()
-    print(f'Best Performance for fold {fold + 1}: Test Acc: {best_test_acc:.4f} | Test Precision: {best_test_precision:.4f} | Test Recall: {best_test_recall:.4f} | Test F1: {best_test_f1:.4f} | Total Train Time: {(train_end_time - train_start_time):.4f} ')
-
-    best_metrics = (best_test_acc, best_test_precision, best_test_recall, best_test_f1)
-    all_metrics.append(best_metrics)
-    plot_loss_acc(pratical_epoch, total_loss, total_test_loss, total_test_acc, fold)# plot loss and acc figure
-
-all_metrics = np.array(all_metrics)
-mean_metrics = all_metrics.mean(axis=0)
-std_metrics = all_metrics.std(axis=0)
-print(f"\n===== Cross-validation Result =====")
-print(f"Mean Accuracy: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
-print(f"Mean Precision: {mean_metrics[1]:.4f} ± {std_metrics[1]:4f}")
-print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
-print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")
-print(f'Best fold: {best_fold}')
-
-if best_model_state_dict is not None:
-    torch.save(best_model_state_dict, './checkpoints/best_model.pth')
+make_gif(image_folder='./figs/embedding_evol')
