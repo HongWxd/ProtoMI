@@ -3,11 +3,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
-from torch_geometric.data import Data
 import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
-import matplotlib.animation as animation
-
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -168,23 +164,4 @@ def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
     plt.tight_layout()
     plt.savefig(f'./figs/fold_{fold+1}_loss_acc_curve.png', dpi=600)
 
-def visualize_embedding_evolution(embedding_snapshots, record_epochs, save_path="./figs/embedding_over_time.gif", fps=10):
-    fig, ax = plt.subplots(figsize=(6, 6))
 
-    def update(frame_idx):
-        ax.clear()
-        embeddings, labels, masks = embedding_snapshots[frame_idx]
-        embeddings = embeddings[masks]
-        labels = labels[masks]
-
-        tsne = TSNE(n_components=2, random_state=42)
-        emb_2d = tsne.fit_transform(embeddings.numpy())
-
-        scatter = ax.scatter(emb_2d[:, 0], emb_2d[:, 1], c=labels.numpy(), cmap='tab10', s=30)
-        ax.set_title(f"Epoch {record_epochs[frame_idx]}")
-        ax.axis('off')
-        return scatter,
-
-    ani = animation.FuncAnimation(fig, update, frames=len(embedding_snapshots), interval=1000 // fps)
-    ani.save(save_path, writer='pillow', fps=fps)
-    print(f"Saved animation to {save_path}")

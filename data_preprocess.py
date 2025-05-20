@@ -17,9 +17,9 @@ with open('./data/labeled_data.pkl', 'wb') as f:
     pickle.dump(labeled_data_list, f)
 
 # save the train, val, test data
-# with open(all_data_path, 'wb') as f:
-#     pickle.dump(all_data, f)
-# print(f'all_data is saved at: {all_data_path}')
+with open(all_data_path, 'wb') as f:
+    pickle.dump(dataset.data, f)
+print(f'all_data is saved at: {all_data_path}')
 
 # with open(train_data_path, 'wb') as f:
 #     pickle.dump(train_data, f)
