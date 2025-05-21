@@ -6,7 +6,7 @@ from model import GCN
 from tqdm import tqdm
 import time
 import pickle
-from utils.tools import plot_loss_acc, visualize_embedding_evolution
+from utils.tools import plot_loss_acc
 from sklearn.model_selection import KFold
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
