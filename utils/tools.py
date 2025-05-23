@@ -106,7 +106,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, co
     for (k, (i,j)) in enumerate(zip(rows, cols)):
         EF[k] = get_bond_features(mol.GetBondBetweenAtoms(int(i),int(j)))
     
-    EF = torch.tensor(EF, dtype = torch.long)
+    EF = torch.tensor(EF, dtype = torch.float)
     
     # construct label tensor
     y_tensor = torch.tensor(np.array([y]), dtype = torch.long)

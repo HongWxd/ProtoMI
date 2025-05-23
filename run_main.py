@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN
+from model import GCN, GCN_with_edge_attr
 from tqdm import tqdm
 import time
 import pickle
@@ -21,10 +21,10 @@ parser.add_argument('--hidden_channels', type=int, default=128, help='Number of 
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
-parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
+parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 
 args = parser.parse_args()
-device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 def train(model, train_loader, device, optimizer, criterion):
     model.train()
@@ -37,8 +37,7 @@ def train(model, train_loader, device, optimizer, criterion):
 
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.batch)
-
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         loss = criterion(out[data.mask], data.y[data.mask])
         loss.backward()
         optimizer.step()
@@ -60,7 +59,7 @@ def evaluate(model, loader, device, criterion):
                 continue
 
             data = data.to(device)
-            out = model(data.x, data.edge_index, data.batch)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch)
             loss = criterion(out[data.mask], data.y[data.mask])
 
             pred = out.argmax(dim=1)
@@ -97,9 +96,14 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GCN(num_node_features=train_data[0].n_node_features,
+    model = GCN(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout).to(device)
+
+    # model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    #     hidden_channels=args.hidden_channels,
+    #     num_classes=args.num_classes, dropout=args.dropout).to(device)\
+
     print(model)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)

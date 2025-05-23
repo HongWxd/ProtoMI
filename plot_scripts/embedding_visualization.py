@@ -8,8 +8,8 @@ import pickle
 import numpy as np
 import torch.nn.functional as F
 import torch
-from torch.nn import Linear, Dropout
-from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool
+from torch.nn import Linear, Dropout, Sequential, ReLU
+from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool, GINEConv
 from sklearn.model_selection import train_test_split
 import imageio.v2 as imageio
 import os
@@ -20,13 +20,13 @@ parser.add_argument('--batch_size', type=int, default=64, help='Batch size for t
 parser.add_argument('--num_classes', type=int, default=3, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=64, help='Number of hidden channels')
-parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
+parser.add_argument('--epoch', type=int, default=800, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 
 args = parser.parse_args()
-device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 class GCN(torch.nn.Module):
     def __init__(self, num_node_features, hidden_channels, num_classes, dropout):
@@ -50,6 +50,33 @@ class GCN(torch.nn.Module):
         x = self.lin(x)
         return x
 
+class GCN_with_edge_attr(torch.nn.Module):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
+        super(GCN_with_edge_attr, self).__init__()
+
+        nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
+        self.conv1 = GINEConv(nn1, edge_dim=num_edge_features)
+
+        nn2 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
+        self.conv2 = GINEConv(nn2, edge_dim=num_edge_features)
+
+        self.lin = Linear(hidden_channels, num_classes)
+        self.dropout = Dropout(dropout)
+
+    def forward(self, x, edge_index, edge_attr, batch):
+        x = self.conv1(x, edge_index, edge_attr)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv2(x, edge_index, edge_attr)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = global_mean_pool(x, batch)
+
+        x = self.lin(x)
+        return x
+
 def visualize_embeddings(model, dataloader, epoch):
     model.eval()
     all_embeds = []
@@ -57,7 +84,7 @@ def visualize_embeddings(model, dataloader, epoch):
     with torch.no_grad():
         for data in dataloader:
             data = data.to(device)
-            embeds = model(data.x, data.edge_index, data.batch)
+            embeds = model(data.x, data.edge_index, data.edge_attr, data.batch)
             all_embeds.append(embeds.cpu())
             all_labels.append(data.y.cpu())
 
@@ -81,7 +108,7 @@ def visualize_embeddings(model, dataloader, epoch):
     plt.savefig(f'./figs/embedding_evol/embed_epoch_{epoch:03d}.png')
     plt.close()
 
-with open('./data/all_data.pkl', 'rb') as f:
+with open('./data/labeled_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 train_data, test_data = train_test_split(all_data, test_size=0.2, random_state=42, shuffle=True)
@@ -89,7 +116,11 @@ train_data, test_data = train_test_split(all_data, test_size=0.2, random_state=4
 train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
 test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-model = GCN(num_node_features=train_data[0].n_node_features,
+# model = GCN(num_node_features=train_data[0].n_node_features,
+#         hidden_channels=args.hidden_channels,
+#         num_classes=args.num_classes, dropout=args.dropout).to(device)
+
+model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
         hidden_channels=args.hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout).to(device)
 
@@ -103,7 +134,7 @@ for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
     for data in train_loader:
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.batch)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
 
         loss = criterion(out, data.y)
         loss.backward()
