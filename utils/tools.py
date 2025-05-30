@@ -4,6 +4,7 @@ from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -137,7 +138,35 @@ def get_statistical_values(x_smiles):
         all_covalent.append(float(Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum())))
 
     return all_masses, all_vdw, all_covalent
+
+def unlabeled_weight(epoch, T1, T2):
+        alpha = 0.0
+        af = 3
+        if epoch > T1:
+            alpha = (epoch-T1) / (T2-T1)*af
+            if epoch > T2:
+                alpha = af
+        return alpha
+
+def self_training(model, data, loss, out, epoch, criterion, device, args):
+    model.eval()
+    with torch.no_grad():
+        logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        probs = F.softmax(logits, dim=-1)
+        confidence, pseudo_labels = probs.max(dim=1)
+
+    model.train()
+    high_conf_mask = (confidence > args.threshold) & (~data.mask)
+    if high_conf_mask.sum() > 0:
+        pseudo_labels = pseudo_labels.detach()
+        pseudo_loss = criterion(out[high_conf_mask], pseudo_labels[high_conf_mask])
+        loss += pseudo_loss*unlabeled_weight(epoch, args.T1, args.T2)
+        pseudo_samples = int(len(out[high_conf_mask]))
+    else:
+        pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
+        pseudo_samples = 0
     
+    return loss, pseudo_loss, pseudo_samples
 
 def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
     epochs = list(range(1, num_epochs + 1))

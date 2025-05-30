@@ -1,5 +1,7 @@
 import pickle
 from utils.data_loader import MoleculeDataset
+import itertools
+from tqdm import tqdm
 
 # paths
 labeled_path = './data/labeled_data.csv'
@@ -12,23 +14,21 @@ all_data_path = './data/all_data.pkl'
 
 # load the dataset
 dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path)
-labeled_data_list = dataset.save_labeled_data()
-with open('./data/labeled_data.pkl', 'wb') as f:
-    pickle.dump(labeled_data_list, f)
+graph_data_pairs = dataset.build_graph_pairs()
+with open('./data/data_pairs.pkl', 'wb') as f:
+    pickle.dump(graph_data_pairs, f)
 
-# save the train, val, test data
-# with open(all_data_path, 'wb') as f:
-#     pickle.dump(dataset.data, f)
-# print(f'all_data is saved at: {all_data_path}')
 
-# with open(train_data_path, 'wb') as f:
-#     pickle.dump(train_data, f)
-# print(f'train_data is saved at: {train_data_path}')
+# pairs = itertools.combinations(data_list, 2)
+# all_pairs = []
+# for pair in pairs:
+#     if pair[0].y == pair[1].y == 1:
+#         print(pair[0].y, pair[1].y)
+#         all_pairs.append((pair[0], pair[1], 1))
+#     else:
+#         print(pair[0].y, pair[1].y)
+#         all_pairs.append((pair[0], pair[1], 0))
+    
 
-# with open(val_data_path, 'wb') as f:
-#     pickle.dump(val_data, f)
-# print(f'val_data is saved at: {val_data_path}')
 
-# with open(test_data_path, 'wb') as f:
-#     pickle.dump(test_data, f)
-# print(f'test_data is saved at: {test_data_path}')
+

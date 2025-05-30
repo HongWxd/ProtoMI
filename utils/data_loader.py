@@ -7,6 +7,8 @@ from utils.tools import Graph_data_generator, get_statistical_values
 from sklearn.model_selection import train_test_split
 from rdkit import Chem
 import numpy as np
+import itertools
+import pickle
 
 class MoleculeDataset(Dataset):
     def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=True, 
@@ -113,6 +115,26 @@ class MoleculeDataset(Dataset):
                 labeled_data_list.append(data)
         
         return labeled_data_list
+
+    def build_graph_pairs(self):
+        pairs = itertools.combinations(self.data, 2)
+        n = self.__len__()
+        pairs_len = n * (n-1) // 2
+        all_pairs = []
+        split = 0
+        for pair, i in zip(pairs, tqdm(range(pairs_len))):
+            print(i)
+            if pair[0].y == pair[1].y == 1:
+                all_pairs.append((pair[0], pair[1], 1))
+            else:
+                all_pairs.append((pair[0], pair[1], 0))
+            
+            if len(all_pairs) >= 50000000:
+                with open(f'./data/graph_data_pairs_{split + 1}.pkl', 'wb') as file:
+                    pickle.dump(all_pairs, file)
+                print(f'graph_data_pairs_{split + 1}.pkl is saved at: ./data/')
+                all_pairs = []
+    
 
     def __len__(self):
         return len(self.data)

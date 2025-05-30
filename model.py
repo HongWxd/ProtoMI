@@ -36,6 +36,9 @@ class GCN_with_edge_attr(torch.nn.Module):
         nn2 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv2 = GINEConv(nn2, edge_dim=num_edge_features)
 
+        nn3 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
+        self.conv3 = GINEConv(nn3, edge_dim=num_edge_features)
+
         self.lin1 = Linear(hidden_channels, hidden_channels)
         self.lin2 = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
@@ -46,6 +49,10 @@ class GCN_with_edge_attr(torch.nn.Module):
         x = self.dropout(x)
 
         x = self.conv2(x, edge_index, edge_attr)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv3(x, edge_index, edge_attr)
         x = F.relu(x)
         x = self.dropout(x)
 

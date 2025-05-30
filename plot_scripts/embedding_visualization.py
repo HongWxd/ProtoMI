@@ -20,7 +20,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='Batch size for t
 parser.add_argument('--num_classes', type=int, default=3, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=64, help='Number of hidden channels')
-parser.add_argument('--epoch', type=int, default=800, help='Number of training epochs')
+parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
@@ -29,14 +29,14 @@ args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 class GCN(torch.nn.Module):
-    def __init__(self, num_node_features, hidden_channels, num_classes, dropout):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
         super(GCN, self).__init__()
         self.conv1 = GCNConv(num_node_features, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.lin = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, x, edge_index, edge_attr, batch):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.dropout(x)
