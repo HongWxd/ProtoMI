@@ -130,9 +130,10 @@ class MoleculeDataset(Dataset):
                 all_pairs.append((pair[0], pair[1], 0))
             
             if len(all_pairs) >= 50000000:
-                with open(f'./data/graph_data_pairs_{split + 1}.pkl', 'wb') as file:
+                split = split + 1
+                with open(f'./data/graph_data_pairs_{split}.pkl', 'wb') as file:
                     pickle.dump(all_pairs, file)
-                print(f'graph_data_pairs_{split + 1}.pkl is saved at: ./data/')
+                print(f'graph_data_pairs_{split}.pkl is saved at: ./data/')
                 all_pairs = []
     
 
