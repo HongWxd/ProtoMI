@@ -24,7 +24,6 @@ with open('./data/all_data.pkl', 'rb') as file:
     
 graph_index_list = list(range(len(all_data)))
 index_pairs = itertools.combinations(graph_index_list, 2)
-print(len(index_pairs))
 n = len(all_data)
 pairs_len = n * (n-1) // 2
 all_pairs = []
