@@ -11,6 +11,7 @@ from sklearn.model_selection import KFold
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import torch.nn.functional as F
+import itertools
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
@@ -95,6 +96,7 @@ def evaluate(model, loader, device, criterion):
 
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
+
 
 best_fold = 0
 overall_best_acc = 0

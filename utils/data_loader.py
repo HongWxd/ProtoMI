@@ -116,27 +116,6 @@ class MoleculeDataset(Dataset):
         
         return labeled_data_list
 
-    def build_graph_pairs(self):
-        pairs = itertools.combinations(self.data, 2)
-        n = self.__len__()
-        pairs_len = n * (n-1) // 2
-        all_pairs = []
-        split = 0
-        for pair, i in zip(pairs, tqdm(range(pairs_len))):
-            print(i)
-            if pair[0].y == pair[1].y == 1:
-                all_pairs.append((pair[0], pair[1], 1))
-            else:
-                all_pairs.append((pair[0], pair[1], 0))
-            
-            if len(all_pairs) >= 50000000:
-                split = split + 1
-                with open(f'./data/graph_data_pairs_{split}.pkl', 'wb') as file:
-                    pickle.dump(all_pairs, file)
-                print(f'graph_data_pairs_{split}.pkl is saved at: ./data/')
-                all_pairs = []
-    
-
     def __len__(self):
         return len(self.data)
     
