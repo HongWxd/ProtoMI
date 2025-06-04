@@ -24,6 +24,7 @@ with open('./data/all_data.pkl', 'rb') as file:
     
 graph_index_list = list(range(len(all_data)))
 index_pairs = itertools.combinations(graph_index_list, 2)
+print(len(index_pairs))
 n = len(all_data)
 pairs_len = n * (n-1) // 2
 all_pairs = []
@@ -31,8 +32,8 @@ split = 0
 for pair, i in zip(index_pairs, tqdm(range(pairs_len))):
     if all_data[pair[0]].y == all_data[pair[1]].y == 1:
         all_pairs.append((pair[0], pair[1], 1))
-    # else:
-    #     all_pairs.append((pair[0], pair[1], 0))
+    else:
+        all_pairs.append((pair[0], pair[1], 0))
 
 print(len(all_pairs))
 
