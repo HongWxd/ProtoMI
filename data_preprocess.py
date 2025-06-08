@@ -35,5 +35,7 @@ for pair, i in zip(index_pairs, tqdm(range(pairs_len))):
         all_pairs.append((pair[0], pair[1], 0))
 
 print(len(all_pairs))
+with open('/data/hwx/data_pairs.pkl', 'wb') as f:
+    pickle.dump(all_pairs, f)
 
 
