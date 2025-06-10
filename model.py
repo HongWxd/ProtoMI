@@ -25,10 +25,9 @@ class GCN(torch.nn.Module):
         x = self.lin(x)
         return x
 
-
-class GCN_with_edge_attr(torch.nn.Module):
+class GINE(torch.nn.Module):
     def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
-        super(GCN_with_edge_attr, self).__init__()
+        super(GINE, self).__init__()
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv1 = GINEConv(nn1, edge_dim=num_edge_features)

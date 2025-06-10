@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import AllChem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from sklearn.metrics import normalized_mutual_info_score
+from ase import Atoms
+from dscribe.descriptors import SOAP
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -73,7 +76,35 @@ def get_bond_features(bond,
 
     return np.array(bond_feature_vector)
 
-def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std):
+def get_SOAP_descriptor(mol, vdw_max):
+    SOAP_mol = Chem.AddHs(mol)
+    AllChem.EmbedMolecule(SOAP_mol)
+    AllChem.UFFOptimizeMolecule(SOAP_mol)
+    conf = SOAP_mol.GetConformer()
+    positions = []
+    symbols = []
+    for atom in SOAP_mol.GetAtoms():
+        pos = conf.GetAtomPosition(atom.GetIdx())
+        positions.append([pos.x, pos.y, pos.z])
+        symbols.append(atom.GetSymbol())
+    positions = np.array(positions)
+
+    ase_mol = Atoms(symbols=symbols, positions=positions)
+
+    species = list(set(symbols))
+    soap = SOAP(
+        species=species,
+        periodic=False,
+        r_cut=2*vdw_max,
+        n_max=8,
+        l_max=6,
+    )
+    soap_descriptor = soap.create(ase_mol)
+    # print("SOAP shape:", soap_descriptor.shape)
+
+    return soap_descriptor
+
+def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
@@ -86,7 +117,9 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, co
     unrelated_mol = Chem.MolFromSmiles(unrelated_smiles)
     n_node_features = len(get_atom_features(unrelated_mol.GetAtomWithIdx(0), mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std))
     n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
-    # print(smiles, n_nodes, n_edges, unrelated_smiles, unrelated_mol, n_node_features, n_edge_features)
+
+    # get descriptors
+    soap_descriptor = get_SOAP_descriptor(mol)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
     X = np.zeros((n_nodes, n_node_features))
@@ -100,7 +133,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, co
     (rows, cols) = np.nonzero(GetAdjacencyMatrix(mol))
     torch_rows = torch.from_numpy(rows.astype(np.int64)).to(torch.long)
     torch_cols = torch.from_numpy(cols.astype(np.int64)).to(torch.long)
-    E = torch.stack([torch_rows, torch_cols], dim = 0)
+    E = torch.stack([torch_rows, torch_cols], dim = 0) # (2, n_edges)
     
     # construct edge feature array EF of shape (n_edges, n_edge_features)
     EF = np.zeros((n_edges, n_edge_features))
@@ -185,7 +218,6 @@ def greedy_select_facilities(embeddings, k):
         remaining.remove(next_idx)
 
     return embeddings[selected]
-
 
 def facility_location_loss(embeddings, labels, gamma=1.0):
     # embeddings: [B, D], labels: [B]

@@ -1,5 +1,6 @@
 import os 
 import pandas as pd
+from dscribe.descriptors import SOAP
 
 labeled_data_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
 all_data_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))

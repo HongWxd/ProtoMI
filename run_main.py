@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN, GCN_with_edge_attr
+from model import GCN, GINE
 from tqdm import tqdm
 import time
 import pickle
@@ -38,8 +38,6 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
     model.train()
     total_loss = 0
     total_samples = 0
-    total_pseudo_loss = 0
-    total_pseudo_samples = 0
 
     for data in train_loader:
         if data.mask.sum() == 0:
@@ -51,19 +49,10 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
         # loss = facility_location_loss(out[data.mask], data.y[data.mask])
 
-        # if args.training_methods == 'Self_Training':
-        #     loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
-        # else:
-        #     pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
-        #     pseudo_samples = 0
-        
         loss.backward()
         optimizer.step()
-
         total_loss += loss.item()
-        # total_pseudo_loss += pseudo_loss.item()
         total_samples += int(data.mask.sum())
-        # total_pseudo_samples += pseudo_samples
     
     return total_loss, total_samples
 
@@ -102,7 +91,6 @@ def evaluate(model, loader, device, criterion):
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
-
 best_fold = 0
 overall_best_acc = 0
 all_metrics = []
@@ -117,7 +105,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    model = GINE(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout).to(device)
 
@@ -165,10 +153,6 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 break  # stop training early
         
         avg_train_loss = total_train_loss / train_samples
-        # if total_pseudo_samples == 0:
-        #     avg_pseudo_loss = 0
-        # else:
-        #     avg_pseudo_loss = total_pseudo_loss / total_pseudo_samples
         avg_test_loss = test_loss / test_samples
         total_loss.append(avg_train_loss)
         total_test_loss.append(avg_test_loss)

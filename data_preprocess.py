@@ -12,32 +12,40 @@ val_data_path = './data/val_data.pkl'
 test_data_path = './data/test_data.pkl'
 all_data_path = './data/all_data.pkl'
 
-# # load the dataset
-# dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path)
-# all_data = dataset.data
-# with open('./data/all_data.pkl', 'wb') as f:
-#     pickle.dump(dataset.data, f)
+# load the dataset
+dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path)
+all_data = dataset.data
+with open('./data/all_data.pkl', 'wb') as f:
+    pickle.dump(dataset.data, f)
 
-with open('./data/all_data.pkl', 'rb') as file:
-    all_data = pickle.load(file)
+
+
+
+
+
+
+
+# # preprocess the graph pairs for matric learning
+# with open('./data/all_data.pkl', 'rb') as file:
+#     all_data = pickle.load(file)
     
-graph_index_list = list(range(len(all_data)))
-index_pairs = itertools.combinations(graph_index_list, 2)
-n = len(all_data)
-pairs_len = n * (n-1) // 2
-all_pairs = []
-split = 0
-for pair, i in zip(index_pairs, tqdm(range(pairs_len))):
-    if all_data[pair[0]].y == all_data[pair[1]].y == 1:
-        all_pairs.append((pair[0], pair[1], 1))
-    else:
-        all_pairs.append((pair[0], pair[1], 0))
+# graph_index_list = list(range(len(all_data)))
+# index_pairs = itertools.combinations(graph_index_list, 2)
+# n = len(all_data)
+# pairs_len = n * (n-1) // 2
+# all_pairs = []
+# split = 0
+# for pair, i in zip(index_pairs, tqdm(range(pairs_len))):
+#     if all_data[pair[0]].y == all_data[pair[1]].y == 1:
+#         all_pairs.append((pair[0], pair[1], 1))
+#     else:
+#         all_pairs.append((pair[0], pair[1], 0))
     
-    if len(all_pairs) >= 100000000:
-        split += 1
-        with open(f'/data/hwx/Boron/data_pairs_{split}.pkl', 'wb') as f:
-            pickle.dump(all_pairs, f)
+#     if len(all_pairs) >= 100000000:
+#         split += 1
+#         with open(f'/data/hwx/Boron/data_pairs_{split}.pkl', 'wb') as f:
+#             pickle.dump(all_pairs, f)
         
-        all_pairs = []
+#         all_pairs = []
 
 

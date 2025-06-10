@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN, GCN_with_edge_attr
+from model import GCN, GINE
 from tqdm import tqdm
 import time
 import pickle
@@ -117,7 +117,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    model = GINE(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout).to(device)
 
