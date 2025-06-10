@@ -5,6 +5,7 @@ from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+from sklearn.metrics import normalized_mutual_info_score
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -167,6 +168,55 @@ def self_training(model, data, loss, out, epoch, criterion, device, args):
         pseudo_samples = 0
     
     return loss, pseudo_loss, pseudo_samples
+
+def greedy_select_facilities(embeddings, k):
+    # Greedy Max-Min selection of k medoids
+    selected = []
+    remaining = list(range(len(embeddings)))
+    selected.append(torch.randint(0, len(embeddings), (1,)).item())
+
+    for _ in range(1, k):
+        dists = torch.stack([
+            torch.norm(embeddings[i] - embeddings[selected], dim=1).min()
+            for i in remaining
+        ])
+        next_idx = remaining[dists.argmax().item()]
+        selected.append(next_idx)
+        remaining.remove(next_idx)
+
+    return embeddings[selected]
+
+
+def facility_location_loss(embeddings, labels, gamma=1.0):
+    # embeddings: [B, D], labels: [B]
+    device = embeddings.device
+    unique_labels = labels.unique()
+
+    # Ground truth score
+    gt_loss = 0.0
+    for lbl in unique_labels:
+        cluster = embeddings[labels == lbl]
+        if cluster.shape[0] <= 1:
+            continue
+        dists = torch.cdist(cluster, cluster)
+        medoid_idx = dists.sum(dim=1).argmin()
+        medoid = cluster[medoid_idx]
+        gt_loss += torch.norm(cluster - medoid, dim=1).sum()
+    gt_loss = -gt_loss
+
+    # Approximate worst clustering (greedy)
+    S = greedy_select_facilities(embeddings, k=len(unique_labels))
+    dist_mat = torch.cdist(embeddings, S)
+    min_dist = dist_mat.min(dim=1)[0]
+    F_S = -min_dist.sum()
+
+    # NMI term
+    pred_labels = dist_mat.argmin(dim=1).detach().cpu().numpy()
+    true_labels = labels.detach().cpu().numpy()
+    delta = 1.0 - normalized_mutual_info_score(true_labels, pred_labels)
+
+    loss = torch.clamp(F_S + gamma * delta - gt_loss, min=0.0)
+    return loss
 
 def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
     epochs = list(range(1, num_epochs + 1))

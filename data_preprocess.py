@@ -18,7 +18,6 @@ all_data_path = './data/all_data.pkl'
 # with open('./data/all_data.pkl', 'wb') as f:
 #     pickle.dump(dataset.data, f)
 
-
 with open('./data/all_data.pkl', 'rb') as file:
     all_data = pickle.load(file)
     
@@ -33,7 +32,12 @@ for pair, i in zip(index_pairs, tqdm(range(pairs_len))):
         all_pairs.append((pair[0], pair[1], 1))
     else:
         all_pairs.append((pair[0], pair[1], 0))
-
-print(len(all_pairs))
+    
+    if len(all_pairs) >= 100000000:
+        split += 1
+        with open(f'/data/hwx/Boron/data_pairs_{split}.pkl', 'wb') as f:
+            pickle.dump(all_pairs, f)
+        
+        all_pairs = []
 
 
