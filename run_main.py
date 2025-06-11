@@ -11,7 +11,6 @@ from sklearn.model_selection import KFold
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import torch.nn.functional as F
-import itertools
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -38,6 +37,8 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
     model.train()
     total_loss = 0
     total_samples = 0
+    total_pseudo_loss = 0
+    total_pseudo_samples = 0
 
     for data in train_loader:
         if data.mask.sum() == 0:
@@ -49,10 +50,18 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
         # loss = facility_location_loss(out[data.mask], data.y[data.mask])
 
+        # if args.training_methods == 'Self_Training':
+        #     loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
+        # else:
+        #     pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
+        #     pseudo_samples = 0
+
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
         total_samples += int(data.mask.sum())
+        # total_pseudo_loss += pseudo_loss.item()
+        # total_pseudo_samples += pseudo_samples
     
     return total_loss, total_samples
 
@@ -71,6 +80,8 @@ def evaluate(model, loader, device, criterion):
             out = model(data.x, data.edge_index, data.edge_attr, data.batch)
             loss = criterion(out[data.mask], data.y[data.mask])
             # loss = facility_location_loss(out[data.mask], data.y[data.mask])
+            # probs = F.softmax(out, dim=-1)
+            # print(out)
 
             pred = out.argmax(dim=1)
             all_preds.append(pred[data.mask].cpu())
@@ -88,7 +99,7 @@ def evaluate(model, loader, device, criterion):
 
     return accuracy, precision, recall, f1, total_samples, total_loss
 
-with open('./data/all_data.pkl', 'rb') as f:
+with open('./data/labeled_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 best_fold = 0

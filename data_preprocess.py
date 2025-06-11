@@ -13,15 +13,9 @@ test_data_path = './data/test_data.pkl'
 all_data_path = './data/all_data.pkl'
 
 # load the dataset
-dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path)
-all_data = dataset.data
-with open('./data/all_data.pkl', 'wb') as f:
+dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=True)
+with open('./data/baseline_data.pkl', 'wb') as f:
     pickle.dump(dataset.data, f)
-
-
-
-
-
 
 
 

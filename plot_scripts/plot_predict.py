@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,12 +10,10 @@ from pysmiles import read_smiles
 from tqdm import tqdm
 from rdkit import Chem
 from rdkit import DataStructs
-from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans
 
 warnings.filterwarnings('ignore')
 
@@ -69,15 +66,26 @@ def plot_distribution():
     df_0 = pd.DataFrame(pd.read_csv('./data/predict_0.csv'))
     smiles_0 = (df_0['smile'].values.tolist())
     smiles = smiles_1 + smiles_0
+    labeled_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
+    labeled_smile = (labeled_df['smile'].values.tolist())
+    label = (labeled_df['label'].values.tolist())
 
     # create a list of mols
-    mols = []
     none_smiles = []
-    for smile in smiles:
+    new_smiles = []
+    for i, smile in enumerate(smiles):
+        # if i > 200:
+        #     break        
+        new_smiles.append(smile)
+    new_smiles = new_smiles + labeled_smile
+
+    mols = []
+    for i, smile in enumerate(new_smiles):
         if Chem.MolFromSmiles(smile) is None:
             none_smiles.append(smile)
         else:
             mols.append(Chem.MolFromSmiles(smile))
+
     smiles = [i for i in smiles if i not in none_smiles]
 
     # create a list of fingerprints from mols
@@ -92,28 +100,44 @@ def plot_distribution():
                     init='random', perplexity=3).fit_transform(X_scaled)
 
     plt.figure()
-    # colors = ["navy", "turquoise", "darkorange", "yellowgreen"]
-    colors = ["darkorange", "yellowgreen"]
+    colors = ["navy", "turquoise", "darkorange", "yellowgreen"]
+    # colors = ["yellowgreen"]
     lw = 2
-    # target_names = ['Li', 'Na', 'Li_Na', 'Other']
-    target_names = ['SEI', 'no_SEI']
+    # target_names = ['predict_0', 'predict_1', 'SEI_0', 'SEI_1']
+    target_names = ['predict_1', 'SEI_1']
+    markers = ['o', 'x', 's', 'd']
+    # target_names = ['SEI']
 
     y = []
-    for smile in smiles_1:
-        y.append(1)
-    for smile in smiles_0:
-        y.append(0)
+    for smile in tqdm(new_smiles):
+        if smile in smiles_1:
+            y.append(1)
+        elif smile in smiles_0:
+            y.append(0)
+    
+    for smile, label in zip(tqdm(labeled_smile), label):
+        if int(label) == 1:
+            y.append(21)
+        elif int(label) == 0:
+            y.append(20)
 
     y = np.array(y)
-    markers = ['o', 's']
-    for color, i, target_name, marker in zip(colors, [0, 1], target_names, markers):
+    
+    for color, i, target_name, marker in zip(colors, [1, 21], target_names, markers):
         plt.scatter(
             X_embedded[y == i, 0], X_embedded[y == i, 1], color=color, alpha=0.8, lw=lw, label=target_name, marker=marker
         )
+
+    for value, smile in zip(X_embedded, new_smiles):
+        if smile in labeled_smile:
+            continue
+        
+        print(value, smile)
 
     plt.legend(loc="best", shadow=False, scatterpoints=1)
     plt.title("t-SNE of prediction molecule")
     plt.tight_layout()
     plt.savefig('./figs/predict_t-SNE.jpg', dpi=600)
 
+# plot_ball_stick()
 plot_distribution()
