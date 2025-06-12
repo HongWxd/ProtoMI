@@ -25,7 +25,7 @@ parser.add_argument('--epoch', type=int, default=300, help='Number of training e
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
-parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
+parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.9, help='threshold of self training')
 parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
 parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
@@ -48,13 +48,15 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         optimizer.zero_grad()
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
-        # loss = facility_location_loss(out[data.mask], data.y[data.mask])
 
         if args.training_methods == 'Self_Training':
             loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
         else:
             pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
             pseudo_samples = 0
+        
+        ture_sample = [i for i in data if i.mask == True]
+        print('epoch:', epoch, len(ture_sample))
 
         loss.backward()
         optimizer.step()
@@ -79,9 +81,6 @@ def evaluate(model, loader, device, criterion):
             data = data.to(device)
             out = model(data.x, data.edge_index, data.edge_attr, data.batch)
             loss = criterion(out[data.mask], data.y[data.mask])
-            # loss = facility_location_loss(out[data.mask], data.y[data.mask])
-            # probs = F.softmax(out, dim=-1)
-            # print(out)
 
             pred = out.argmax(dim=1)
             all_preds.append(pred[data.mask].cpu())
@@ -99,7 +98,7 @@ def evaluate(model, loader, device, criterion):
 
     return accuracy, precision, recall, f1, total_samples, total_loss
 
-with open('./data/labeled_data.pkl', 'rb') as f:
+with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 best_fold = 0

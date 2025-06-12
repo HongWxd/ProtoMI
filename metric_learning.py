@@ -28,8 +28,6 @@ parser.add_argument('--folds', type=int, default=10, help='fold number of cross 
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.9, help='threshold of self training')
-# parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
-# parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
 
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
@@ -38,8 +36,6 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
     model.train()
     total_loss = 0
     total_samples = 0
-    total_pseudo_loss = 0
-    total_pseudo_samples = 0
 
     for data in train_loader:
         if data.mask.sum() == 0:
@@ -50,20 +46,12 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
         # loss = facility_location_loss(out[data.mask], data.y[data.mask])
-
-        # if args.training_methods == 'Self_Training':
-        #     loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
-        # else:
-        #     pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
-        #     pseudo_samples = 0
         
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
-        # total_pseudo_loss += pseudo_loss.item()
         total_samples += int(data.mask.sum())
-        # total_pseudo_samples += pseudo_samples
     
     return total_loss, total_samples
 
@@ -101,7 +89,6 @@ def evaluate(model, loader, device, criterion):
 
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
-
 
 best_fold = 0
 overall_best_acc = 0
@@ -165,10 +152,6 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 break  # stop training early
         
         avg_train_loss = total_train_loss / train_samples
-        # if total_pseudo_samples == 0:
-        #     avg_pseudo_loss = 0
-        # else:
-        #     avg_pseudo_loss = total_pseudo_loss / total_pseudo_samples
         avg_test_loss = test_loss / test_samples
         total_loss.append(avg_train_loss)
         total_test_loss.append(avg_test_loss)

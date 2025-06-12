@@ -194,8 +194,13 @@ def self_training(model, data, loss, out, epoch, criterion, device, args):
     if high_conf_mask.sum() > 0:
         pseudo_labels = pseudo_labels.detach()
         pseudo_loss = criterion(out[high_conf_mask], pseudo_labels[high_conf_mask])
-        loss += pseudo_loss*unlabeled_weight(epoch, args.T1, args.T2)
+        # loss += pseudo_loss
         pseudo_samples = int(len(out[high_conf_mask]))
+
+        data.y = data.y.clone()
+        data.mask = data.mask.clone()
+        data.y[high_conf_mask] = pseudo_labels[high_conf_mask]
+        data.mask[high_conf_mask] = True
     else:
         pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
         pseudo_samples = 0

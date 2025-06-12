@@ -12,6 +12,7 @@ from tqdm import tqdm
 from rdkit import Chem
 import xgboost as xgb
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.preprocessing import OneHotEncoder
 
 parser = argparse.ArgumentParser(description="Train the machine learning models")
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
@@ -29,6 +30,7 @@ for data in all_data:
 
 # create a list of mols
 none_smiles = []
+new_smiles = []
 mols = []
 y = []
 for (i, smile), label in zip(enumerate(smiles), label):
@@ -37,9 +39,17 @@ for (i, smile), label in zip(enumerate(smiles), label):
     else:
         mols.append(Chem.MolFromSmiles(smile))
         y.append(label)
+        new_smiles.append(smile)
 
+# get one-hot for SMILES
+OneHotSmiles = []
+for smile in new_smiles:
+    one_hot_smile = 1
+    OneHotSmiles.append(one_hot_smile)
+ 
 # create a list of fingerprints from mols
-X = [Chem.RDKFingerprint(mol) for mol in tqdm(mols)]
+# X = [Chem.RDKFingerprint(mol) for mol in tqdm(mols)]
+X = OneHotSmiles
 
 best_fold = 0
 all_metrics = []
@@ -53,7 +63,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    args.model = 'XGB'
+    args.model = 'DT'
     if args.model == 'SVM':
         model = SVC(kernel='rbf', C=1.0, gamma='scale', probability=True)
     elif args.model == 'RF':
