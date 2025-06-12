@@ -26,20 +26,24 @@ parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.9, help='threshold of self training')
+parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
 parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
 parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
 
 args = parser.parse_args()
-device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
 
 def train(model, train_loader, device, optimizer, criterion, epoch, args):
     model.train()
     total_loss = 0
     total_samples = 0
-    total_pseudo_loss = 0
-    total_pseudo_samples = 0
 
+    total_masked = 0
+    for data in train_loader:
+        total_masked += int(data.mask.sum())
+    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked}")
+
+    update_data_list = []
     for data in train_loader:
         if data.mask.sum() == 0:
             continue
@@ -49,23 +53,25 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
 
-        if args.training_methods == 'Self_Training':
-            loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
-        else:
-            pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
-            pseudo_samples = 0
-        
-        ture_sample = [i for i in data if i.mask == True]
-        print('epoch:', epoch, len(ture_sample))
-
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
         total_samples += int(data.mask.sum())
-        total_pseudo_loss += pseudo_loss.item()
-        total_pseudo_samples += pseudo_samples
     
-    return total_loss, total_samples, total_pseudo_loss, total_pseudo_samples
+        if args.training_methods == 'Self_Training':
+            loss, update_data = self_training(model, data, loss, out, epoch, criterion, device, args)
+            update_data_list.append(update_data.cpu())
+        else:
+            update_data_list.append(data.cpu())
+
+    train_loader = DataLoader(update_data_list, batch_size=args.batch_size, shuffle=True)
+    # train_loader = update_data_list
+    total_masked = 0
+    for data in train_loader:
+        total_masked += int(data.mask.sum())
+    print(f"[Epoch {epoch}] Updated train set labeled (mask=True): {total_masked}")
+    
+    return total_loss, total_samples, train_loader
 
 def evaluate(model, loader, device, criterion):
     model.eval()
@@ -138,7 +144,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
         start_time = time.time()
-        total_train_loss, train_samples, total_pseudo_loss, total_pseudo_samples = train(model, train_loader, device, optimizer, criterion, epoch, args)
+        total_train_loss, train_samples, train_loader = train(model, train_loader, device, optimizer, criterion, epoch, args)
         train_accuracy, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device, criterion)
         test_accuracy, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device, criterion)
         end_time = time.time()
@@ -162,17 +168,17 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 pratical_epoch = epoch - 1
                 break  # stop training early
         
-        if total_pseudo_samples == 0:
-            avg_pseudo_loss = 0
-        else:
-            avg_pseudo_loss = total_pseudo_loss / total_pseudo_samples
+        # if total_pseudo_samples == 0:
+        #     avg_pseudo_loss = 0
+        # else:
+        #     avg_pseudo_loss = total_pseudo_loss / total_pseudo_samples
         avg_train_loss = total_train_loss / train_samples
         avg_test_loss = test_loss / test_samples
         total_loss.append(avg_train_loss)
         total_test_loss.append(avg_test_loss)
         total_test_acc.append(test_accuracy)
 
-        print(f'Fold: {fold+1} | Epoch: {epoch} | Epoch Time: {epoch_time:.4f} | Train Loss: {avg_train_loss:.4f} | Pseudo Loss: {avg_pseudo_loss:.4f} | Test Loss: {avg_test_loss:.4f}')
+        print(f'Fold: {fold+1} | Epoch: {epoch} | Epoch Time: {epoch_time:.4f} | Train Loss: {avg_train_loss:.4f} | Test Loss: {avg_test_loss:.4f}')
         print(f'Train Acc: {train_accuracy:.4f} | Train Precision: {train_precision:.4f} | Train Recall: {train_recall:.4f} | Train F1: {train_f1:.4f}')
         print(f'Test Acc: {test_accuracy:.4f} | Test Precision: {test_precision:.4f} | Test Recall: {test_recall:.4f} | Test F1: {test_f1:.4f}')
 

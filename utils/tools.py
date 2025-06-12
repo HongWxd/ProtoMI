@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from sklearn.metrics import normalized_mutual_info_score
 from ase import Atoms
 from dscribe.descriptors import SOAP
+from torch_geometric.loader import DataLoader
+from torch_geometric.data import Data
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -201,11 +203,34 @@ def self_training(model, data, loss, out, epoch, criterion, device, args):
         data.mask = data.mask.clone()
         data.y[high_conf_mask] = pseudo_labels[high_conf_mask]
         data.mask[high_conf_mask] = True
-    else:
-        pseudo_loss = torch.tensor(0.0, device=device, requires_grad=True)
-        pseudo_samples = 0
     
-    return loss, pseudo_loss, pseudo_samples
+    return loss, data
+
+# def update_training_loader(train_loader, model, device, args):
+#     model.eval()
+#     updated_dataset = []
+#     for data in train_loader.dataset:
+#         data = data.to(device)
+#         if not hasattr(data, 'mask') or data.mask.sum().item() > 0:
+#             updated_dataset.append(data.cpu())
+#             continue
+
+#         with torch.no_grad():
+#             logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
+#             probs = F.softmax(logits, dim=-1)
+#             confidence, pseudo_labels = probs.max(dim=1)
+
+#         high_conf_mask = (confidence > args.threshold)
+#         if high_conf_mask.sum().item() > 0:
+#             data.y = data.y.clone()
+#             data.mask = data.mask.clone()
+#             data.y[high_conf_mask] = pseudo_labels[high_conf_mask].detach().cpu()
+#             data.mask[high_conf_mask] = True
+
+#         updated_dataset.append(data.cpu())
+
+#     print(f"[Update] Expanded labeled set with pseudo-labeled samples. New size: {sum(d.mask.sum().item() for d in updated_dataset)}")
+#     return DataLoader(updated_dataset, batch_size=train_loader.batch_size, shuffle=True)
 
 def greedy_select_facilities(embeddings, k):
     # Greedy Max-Min selection of k medoids
