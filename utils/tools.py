@@ -193,6 +193,7 @@ def self_training(model, data, loss, out, epoch, criterion, device, args):
 
     model.train()
     high_conf_mask = (confidence > args.threshold) & (~data.mask)
+    print(len(high_conf_mask))
     if high_conf_mask.sum() > 0:
         pseudo_labels = pseudo_labels.detach()
         pseudo_loss = criterion(out[high_conf_mask], pseudo_labels[high_conf_mask])

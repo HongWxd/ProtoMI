@@ -31,23 +31,23 @@ parser.add_argument('--T1', type=int, default=1, help='self training warm up epo
 parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
 
 args = parser.parse_args()
-device = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
-def train(model, train_loader, device, optimizer, criterion, epoch, args):
+def train(model, train_data, device, optimizer, criterion, epoch, args):
+    labeled_train_data = [i for i in train_data if i.mask == True]
+    print('train data length:', len(labeled_train_data))
+    unlabeled_train_data = [i for i in train_data if i.mask == False]
+    train_loader = DataLoader(labeled_train_data, batch_size=args.batch_size, shuffle=True)
+
     model.train()
     total_loss = 0
     total_samples = 0
-
     total_masked = 0
     for data in train_loader:
         total_masked += int(data.mask.sum())
     print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked}")
 
-    update_data_list = []
     for data in train_loader:
-        if data.mask.sum() == 0:
-            continue
-
         data = data.to(device)
         optimizer.zero_grad()
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
@@ -58,20 +58,34 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         total_loss += loss.item()
         total_samples += int(data.mask.sum())
     
-        if args.training_methods == 'Self_Training':
-            loss, update_data = self_training(model, data, loss, out, epoch, criterion, device, args)
-            update_data_list.append(update_data.cpu())
-        else:
-            update_data_list.append(data.cpu())
+    if args.training_methods == 'Self_Training':
+        model.eval()
+        unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
+        with torch.no_grad():
+            for data in unlabeled_loader:
+                data = data.to(device)
+                logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
+                probs = torch.softmax(logits, dim=1)
+                confs, preds = torch.max(probs, dim=1)
+                high_conf_mask = confs > args.threshold
 
-    train_loader = DataLoader(update_data_list, batch_size=args.batch_size, shuffle=True)
-    # train_loader = update_data_list
-    total_masked = 0
-    for data in train_loader:
-        total_masked += int(data.mask.sum())
-    print(f"[Epoch {epoch}] Updated train set labeled (mask=True): {total_masked}")
+                if high_conf_mask.sum() > 0:
+                    data.y = data.y.clone()
+                    data.mask = data.mask.clone()
+                    data.y[high_conf_mask] = preds[high_conf_mask]
+                    data.mask[high_conf_mask] = torch.ones_like(data.mask[high_conf_mask], dtype=torch.bool)
+                    
+                    data_list = data.to('cpu').to_data_list()
+                    for i, keep in enumerate(high_conf_mask.cpu()):
+                        if keep:
+                            labeled_train_data.append(data_list[i])
     
-    return total_loss, total_samples, train_loader
+    labeled_train_cid_list = [i.cid for i in labeled_train_data]
+    print(len(labeled_train_cid_list))
+    unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]
+    train_data = labeled_train_data + unlabeled_train_data
+
+    return total_loss, total_samples, train_loader, train_data
 
 def evaluate(model, loader, device, criterion):
     model.eval()
@@ -144,7 +158,8 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
         start_time = time.time()
-        total_train_loss, train_samples, train_loader = train(model, train_loader, device, optimizer, criterion, epoch, args)
+        total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, criterion, epoch, args)
+        train_data = update_train_data
         train_accuracy, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device, criterion)
         test_accuracy, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device, criterion)
         end_time = time.time()
