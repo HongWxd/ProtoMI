@@ -162,17 +162,14 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 best_model_state_dict = model.state_dict()
                 best_fold = fold + 1
         else:
-            early_stop_counter += 1
-            print(f"Early stop counter: {early_stop_counter} / {args.patience}")
-            if early_stop_counter >= args.patience:
-                print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
-                pratical_epoch = epoch - 1
-                break  # stop training early
-        
-        # if total_pseudo_samples == 0:
-        #     avg_pseudo_loss = 0
-        # else:
-        #     avg_pseudo_loss = total_pseudo_loss / total_pseudo_samples
+            if epoch >= args.warm_up_epoch:
+                early_stop_counter += 1
+                print(f"Early stop counter: {early_stop_counter} / {args.patience}")
+                if early_stop_counter >= args.patience:
+                    print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
+                    pratical_epoch = epoch - 1
+                    break  # stop training early
+
         avg_train_loss = total_train_loss / train_samples
         avg_test_loss = test_loss / test_samples
         total_loss.append(avg_train_loss)
