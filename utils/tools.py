@@ -203,7 +203,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 for update_data in update_list:
-                    if len(labeled_train_data) > pseudo_thr*2:
+                    if len(labeled_train_data) >= pseudo_thr*2:
                         continue
                     update_data = update_data.cpu()
                     update_data.mask = update_data.mask.item()
