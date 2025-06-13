@@ -148,7 +148,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
             print(f"Early stop counter: {early_stop_counter} / {args.patience}")
             if early_stop_counter >= args.patience:
                 print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
-                pratical_epoch = epoch - 1
+                pratical_epoch = epoch
                 break  # stop training early
         
         avg_train_loss = total_train_loss / train_samples

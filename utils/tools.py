@@ -216,6 +216,18 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     
     return labeled_train_data
 
+def training_data_analysis(fold, train_data, test_data):
+    train_label_set = [i for i in train_data if i.mask == True]
+    train_1 = len([i for i in train_label_set if i.y == 1])
+    train_0 = len([i for i in train_label_set if i.y == 0])
+
+    test_label_set = [i for i in test_data if i.mask == True]
+    test_1 = len([i for i in test_label_set if i.y == 1])
+    test_0 = len([i for i in test_label_set if i.y == 0])
+
+    print(f'Fold {fold} | train 1: {(train_1) / (train_1 + train_0)} | train 0: {train_0 / (train_1 + train_0)} | test 1: {test_1 / (test_1 + test_0)} | test 0: {test_0 / (test_1 + test_0)} ')
+
+
 def greedy_select_facilities(embeddings, k):
     # Greedy Max-Min selection of k medoids
     selected = []
@@ -265,7 +277,7 @@ def facility_location_loss(embeddings, labels, gamma=1.0):
     return loss
 
 def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
-    epochs = list(range(1, num_epochs + 1))
+    epochs = list(range(1, num_epochs))
 
     plt.figure(figsize=(12, 5))
 

@@ -6,7 +6,7 @@ from model import GCN, GINE
 from tqdm import tqdm
 import time
 import pickle
-from utils.tools import plot_loss_acc, unlabeled_weight, self_training, facility_location_loss
+from utils.tools import plot_loss_acc, unlabeled_weight, self_training, facility_location_loss, training_data_analysis
 from sklearn.model_selection import KFold
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -23,7 +23,7 @@ parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learnin
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
+parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
@@ -43,9 +43,13 @@ def train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, ar
     total_loss = 0
     total_samples = 0
     total_masked = 0
+    label_0 = 0
+    label_1 = 0
     for data in train_loader:
         total_masked += int(data.mask.sum())
-    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked}")
+        label_0 += (data.y == 0).sum().item()
+        label_1 += (data.y == 1).sum().item()
+    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
 
     for i, data in enumerate(train_loader):
         data = data.to(device)
@@ -112,11 +116,11 @@ all_loss_metrics = []
 best_model_state_dict = None
 kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
 for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
-    print(f'\n===== Fold {fold+1} =====')
+    print(f'===== Fold {fold+1} =====')
     train_data = [all_data[i] for i in train_idx]
     test_data = [all_data[i] for i in test_idx]
+    training_data_analysis(fold+1, train_data, test_data)# print the label ratio during training
     pseudo_thr = len([i for i in train_data if i.mask == True])
-    print('pseudo_thr', pseudo_thr)
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
@@ -162,12 +166,12 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 best_model_state_dict = model.state_dict()
                 best_fold = fold + 1
         else:
-            if epoch >= args.warm_up_epoch:
+            if epoch > args.warm_up_epoch:
                 early_stop_counter += 1
                 print(f"Early stop counter: {early_stop_counter} / {args.patience}")
                 if early_stop_counter >= args.patience:
                     print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
-                    pratical_epoch = epoch - 1
+                    pratical_epoch = epoch
                     break  # stop training early
 
         avg_train_loss = total_train_loss / train_samples
