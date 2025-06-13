@@ -184,54 +184,37 @@ def unlabeled_weight(epoch, T1, T2):
                 alpha = af
         return alpha
 
-def self_training(model, data, loss, out, epoch, criterion, device, args):
+def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args):
     model.eval()
+    unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
-        logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
-        probs = F.softmax(logits, dim=-1)
-        confidence, pseudo_labels = probs.max(dim=1)
+        for data in unlabeled_loader:
+            data = data.to(device)
+            logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            probs = F.softmax(logits, dim=-1)
+            confs, preds = probs.max(dim=1)
+            high_conf_mask = confs > args.threshold
 
-    model.train()
-    high_conf_mask = (confidence > args.threshold) & (~data.mask)
-    print(len(high_conf_mask))
-    if high_conf_mask.sum() > 0:
-        pseudo_labels = pseudo_labels.detach()
-        pseudo_loss = criterion(out[high_conf_mask], pseudo_labels[high_conf_mask])
-        # loss += pseudo_loss
-        pseudo_samples = int(len(out[high_conf_mask]))
-
-        data.y = data.y.clone()
-        data.mask = data.mask.clone()
-        data.y[high_conf_mask] = pseudo_labels[high_conf_mask]
-        data.mask[high_conf_mask] = True
+            if high_conf_mask.sum() > 0:
+                data.y = data.y.clone()
+                data.mask = data.mask.clone()
+                data.y[high_conf_mask] = preds[high_conf_mask]
+                data.mask[high_conf_mask] = True
+                
+                update_list = data[high_conf_mask]
+                for update_data in update_list:
+                    if len(labeled_train_data) > pseudo_thr:
+                        continue
+                    update_data = update_data.cpu()
+                    update_data.mask = update_data.mask.item()
+                    update_data.cid = update_data.cid.item()
+                    update_data.n_nodes = update_data.n_nodes.item()
+                    update_data.n_edges = update_data.n_edges.item()
+                    update_data.n_node_features = update_data.n_node_features.item()
+                    update_data.n_edge_features = update_data.n_edge_features.item()
+                    labeled_train_data.append(update_data)
     
-    return loss, data
-
-# def update_training_loader(train_loader, model, device, args):
-#     model.eval()
-#     updated_dataset = []
-#     for data in train_loader.dataset:
-#         data = data.to(device)
-#         if not hasattr(data, 'mask') or data.mask.sum().item() > 0:
-#             updated_dataset.append(data.cpu())
-#             continue
-
-#         with torch.no_grad():
-#             logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
-#             probs = F.softmax(logits, dim=-1)
-#             confidence, pseudo_labels = probs.max(dim=1)
-
-#         high_conf_mask = (confidence > args.threshold)
-#         if high_conf_mask.sum().item() > 0:
-#             data.y = data.y.clone()
-#             data.mask = data.mask.clone()
-#             data.y[high_conf_mask] = pseudo_labels[high_conf_mask].detach().cpu()
-#             data.mask[high_conf_mask] = True
-
-#         updated_dataset.append(data.cpu())
-
-#     print(f"[Update] Expanded labeled set with pseudo-labeled samples. New size: {sum(d.mask.sum().item() for d in updated_dataset)}")
-#     return DataLoader(updated_dataset, batch_size=train_loader.batch_size, shuffle=True)
+    return labeled_train_data
 
 def greedy_select_facilities(embeddings, k):
     # Greedy Max-Min selection of k medoids
