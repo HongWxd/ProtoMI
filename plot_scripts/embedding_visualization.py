@@ -24,6 +24,9 @@ parser.add_argument('--epoch', type=int, default=300, help='Number of training e
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
+parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
+parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
+parser.add_argument('--warm_up_epoch', type=int, default=30, help='self training warm up epoch period')
 
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
@@ -77,7 +80,39 @@ class GCN_with_edge_attr(torch.nn.Module):
         x = self.lin(x)
         return x
 
-def visualize_embeddings(model, dataloader, epoch):
+def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args):
+    model.eval()
+    unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
+    with torch.no_grad():
+        for data in unlabeled_loader:
+            data = data.to(device)
+            logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            probs = F.softmax(logits, dim=-1)
+            confs, preds = probs.max(dim=1)
+            high_conf_mask = confs > args.threshold
+
+            if high_conf_mask.sum() > 0:
+                data.y = data.y.clone()
+                data.mask = data.mask.clone()
+                data.y[high_conf_mask] = preds[high_conf_mask]
+                data.mask[high_conf_mask] = True
+                
+                update_list = data[high_conf_mask]
+                for update_data in update_list:
+                    if len(labeled_train_data) >= pseudo_thr*2:
+                        continue
+                    update_data = update_data.cpu()
+                    update_data.mask = update_data.mask.item()
+                    update_data.cid = update_data.cid.item()
+                    update_data.n_nodes = update_data.n_nodes.item()
+                    update_data.n_edges = update_data.n_edges.item()
+                    update_data.n_node_features = update_data.n_node_features.item()
+                    update_data.n_edge_features = update_data.n_edge_features.item()
+                    labeled_train_data.append(update_data)
+    
+    return labeled_train_data
+
+def visualize_embeddings(model, dataloader, epoch, args):
     model.eval()
     all_embeds = []
     all_labels = []
@@ -105,32 +140,53 @@ def visualize_embeddings(model, dataloader, epoch):
     plt.title(f'Graph Embedding at Epoch {epoch}')
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'./figs/embedding_evol/embed_epoch_{epoch:03d}.png')
+    if args.training_methods == 'Self_Training':
+        plt.savefig(f'./figs/embedding_evol/embed_epoch_{epoch:03d}_SSL.png')
+    else:
+        plt.savefig(f'./figs/embedding_evol/embed_epoch_{epoch:03d}.png')
     plt.close()
 
-with open('./data/labeled_data.pkl', 'rb') as f:
-    all_data = pickle.load(f)
+def SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args):
+    labeled_train_data = [i for i in train_data if i.mask == True]
+    unlabeled_train_data = [i for i in train_data if i.mask == False]
+    train_loader = DataLoader(labeled_train_data, batch_size=args.batch_size, shuffle=True)
 
-train_data, test_data = train_test_split(all_data, test_size=0.2, random_state=42, shuffle=True)
-
-train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
-
-# model = GCN(num_node_features=train_data[0].n_node_features,
-#         hidden_channels=args.hidden_channels,
-#         num_classes=args.num_classes, dropout=args.dropout).to(device)
-
-model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
-        hidden_channels=args.hidden_channels,
-        num_classes=args.num_classes, dropout=args.dropout).to(device)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
-criterion = torch.nn.CrossEntropyLoss()
-
-embeddings_over_time = []
-for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
     model.train()
+    total_loss = 0
+    total_samples = 0
+    total_masked = 0
+    label_0 = 0
+    label_1 = 0
+    for data in train_loader:
+        total_masked += int(data.mask.sum())
+        label_0 += (data.y == 0).sum().item()
+        label_1 += (data.y == 1).sum().item()
+    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
 
+    for i, data in enumerate(train_loader):
+        data = data.to(device)
+        optimizer.zero_grad()
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
+
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        total_samples += int(data.mask.sum())
+        iter_loss = loss / int(data.mask.sum())
+        print(f'\t  Iteras: {i+1} | Loss: {iter_loss:.7f}')
+    
+    if epoch >= args.warm_up_epoch:# Warm up for several epoches
+        if total_masked <= pseudo_thr*2:# Control the pseudo samples 
+            labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args)
+                    
+    labeled_train_cid_list = [i.cid for i in labeled_train_data]
+    unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]
+    train_data = labeled_train_data + unlabeled_train_data
+    return train_data, train_loader
+
+def train(model, train_loader, device, optimizer, criterion):
+    model.train()
     for data in train_loader:
         data = data.to(device)
         optimizer.zero_grad()
@@ -140,13 +196,41 @@ for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
         loss.backward()
         optimizer.step()
 
-    visualize_embeddings(model, train_loader, epoch)
-
-def make_gif(image_folder, output_path='./figs/embedding_evolution.gif'):
+def make_gif(args, image_folder):
+    if args.training_methods == 'Self_Training':
+        output_path='./figs/SSL_embedding_evolution.gif'
+        postfix = 'SSL.png'
+    else:
+        output_path='./figs/embedding_evolution.gif'
+        postfix = '.png'
+    
     images = []
     for epoch in sorted(os.listdir(image_folder)):
-        if epoch.endswith('.png'):
+        if epoch.endswith(postfix):
             images.append(imageio.imread(os.path.join(image_folder, epoch)))
     imageio.mimsave(output_path, images, duration=0.4)
 
-make_gif(image_folder='./figs/embedding_evol')
+# main
+with open('./data/all_data.pkl', 'rb') as f:
+    all_data = pickle.load(f)
+
+train_data, test_data = train_test_split(all_data, test_size=0.2, random_state=42, shuffle=True)
+pseudo_thr = len([i for i in train_data if i.mask == True])
+
+train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
+
+model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+        hidden_channels=args.hidden_channels,
+        num_classes=args.num_classes, dropout=args.dropout).to(device)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
+criterion = torch.nn.CrossEntropyLoss()
+
+for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
+    train_data, train_loader = SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args)
+    # train(model, train_loader, device, optimizer, criterion)
+
+    visualize_embeddings(model, train_loader, epoch, args)
+
+make_gif(args, image_folder='./figs/embedding_evol')

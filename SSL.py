@@ -23,7 +23,7 @@ parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learnin
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
+parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
@@ -113,6 +113,12 @@ best_fold = 0
 overall_best_acc = 0
 all_metrics = []
 all_loss_metrics = []
+label_0_list_init = []
+label_1_list_init = []
+label_mask_list_init = []
+label_mask_list_last = []
+label_0_list_last = []
+label_1_list_last = []
 best_model_state_dict = None
 kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
 for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
@@ -147,6 +153,19 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_start_time = time.time()
 
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
+        total_masked = 0
+        label_0 = 0
+        label_1 = 0
+        for data in train_loader:
+            total_masked += int(data.mask.sum())
+            label_0 += (data.y == 0).sum().item()
+            label_1 += (data.y == 1).sum().item()
+
+        if epoch == 1:
+            label_mask_list_init.append(total_masked)
+            label_0_list_init.append(label_0)
+            label_1_list_init.append(label_1)
+        
         start_time = time.time()
         total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args)
         train_data = update_train_data
@@ -170,6 +189,9 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 early_stop_counter += 1
                 print(f"Early stop counter: {early_stop_counter} / {args.patience}")
                 if early_stop_counter >= args.patience:
+                    label_mask_list_last.append(total_masked)
+                    label_0_list_last.append(label_0)
+                    label_1_list_last.append(label_1)
                     print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
                     pratical_epoch = epoch
                     break  # stop training early
@@ -194,11 +216,17 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 all_metrics = np.array(all_metrics)
 mean_metrics = all_metrics.mean(axis=0)
 std_metrics = all_metrics.std(axis=0)
+mean_label_0_ratio_init = [label_0 / samples for label_0, samples in zip(label_0_list_init, label_mask_list_init)]
+mean_label_1_ratio_init = [label_1 / samples for label_1, samples in zip(label_1_list_init, label_mask_list_init)]
+mean_label_0_ratio_last = [label_0 / samples for label_0, samples in zip(label_0_list_last, label_mask_list_last)]
+mean_label_1_ratio_last = [label_1 / samples for label_1, samples in zip(label_1_list_last, label_mask_list_last)]
 print(f"\n===== Cross-validation Result =====")
 print(f"Mean Accuracy: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f} ± {std_metrics[1]:4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")
+print(f'Mean Label Ratio Init (0:1): {np.mean(mean_label_0_ratio_init)} : {np.mean(mean_label_1_ratio_init)}')
+print(f'Mean Label Ratio Last (0:1): {np.mean(mean_label_0_ratio_last)} : {np.mean(mean_label_1_ratio_last)}')
 print(f'Best fold: {best_fold}')
 
 if best_model_state_dict is not None:
