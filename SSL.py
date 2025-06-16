@@ -227,6 +227,7 @@ print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")
 print(f'Mean Label Ratio Init (0:1): {np.mean(mean_label_0_ratio_init)} : {np.mean(mean_label_1_ratio_init)}')
 print(f'Mean Label Ratio Last (0:1): {np.mean(mean_label_0_ratio_last)} : {np.mean(mean_label_1_ratio_last)}')
+print(f'Mean Label Samples: {np.mean(label_mask_list_last)}')
 print(f'Best fold: {best_fold}')
 
 if best_model_state_dict is not None:
