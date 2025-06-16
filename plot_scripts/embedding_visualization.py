@@ -112,10 +112,16 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     
     return labeled_train_data
 
-def visualize_embeddings(model, dataloader, epoch, args):
+def visualize_embeddings(model, dataloader, epoch, original_train_data, args):
+    origin_cids = []
+    for origin_data in original_train_data:
+        origin_cids.append(origin_data.cid)
+    print('origin_cids', len(origin_cids))
+    
     model.eval()
     all_embeds = []
     all_labels = []
+    all_flags = []
     with torch.no_grad():
         for data in dataloader:
             data = data.to(device)
@@ -123,8 +129,19 @@ def visualize_embeddings(model, dataloader, epoch, args):
             all_embeds.append(embeds.cpu())
             all_labels.append(data.y.cpu())
 
+            cids = data.cid.cpu().numpy()
+            origin_idx = []
+            for i in cids:
+                if i in origin_cids:
+                    origin_idx.append(True)
+                else:
+                    origin_idx.append(False)
+            all_flags.append(origin_idx)
+
     embeds = torch.cat(all_embeds, dim=0).numpy()
     labels = torch.cat(all_labels, dim=0).numpy()
+    flags = np.array([item for sublist in all_flags for item in sublist])
+    # flags = torch.cat(all_flags, dim=0).numpy()
 
     reducer = PCA(n_components=2)
     embeds_2d = reducer.fit_transform(embeds)
@@ -132,9 +149,25 @@ def visualize_embeddings(model, dataloader, epoch, args):
     plt.figure(figsize=(6, 6))
     num_classes = len(np.unique(labels))
 
-    for i in range(num_classes):
-        idx = labels == i
-        plt.scatter(embeds_2d[idx, 0], embeds_2d[idx, 1], label=f'Class {i}', alpha=0.7, s=20)
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
+    labels_map = [
+        'Initial class 0',  # origin=True & label=0
+        'Initial class 1',  # origin=True & label=1
+        'Added class 0',    # origin=False & label=0
+        'Added class 1',    # origin=False & label=1
+    ]
+    for i, (is_origin, class_label) in enumerate([(True, 0), (True, 1), (False, 0), (False, 1)]):
+        idx = (flags == is_origin) & (labels == class_label)
+        
+        plt.scatter(
+            embeds_2d[idx, 0], embeds_2d[idx, 1],
+            label=labels_map[i],
+            alpha=0.7, s=20, color=colors[i]
+        )
+
+    # for i in range(num_classes):
+    #     idx = labels == i
+    #     plt.scatter(embeds_2d[idx, 0], embeds_2d[idx, 1], label=f'Class {i}', alpha=0.7, s=20)
 
     plt.legend()
     plt.title(f'Graph Embedding at Epoch {epoch}')
@@ -150,6 +183,10 @@ def SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr
     labeled_train_data = [i for i in train_data if i.mask == True]
     unlabeled_train_data = [i for i in train_data if i.mask == False]
     train_loader = DataLoader(labeled_train_data, batch_size=args.batch_size, shuffle=True)
+    if epoch == 1:
+        original_train_data = labeled_train_data
+    else:
+        original_train_data = None
 
     model.train()
     total_loss = 0
@@ -183,7 +220,7 @@ def SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr
     labeled_train_cid_list = [i.cid for i in labeled_train_data]
     unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]
     train_data = labeled_train_data + unlabeled_train_data
-    return train_data, train_loader
+    return train_data, train_loader, original_train_data
 
 def train(model, train_loader, device, optimizer, criterion):
     model.train()
@@ -227,10 +264,15 @@ model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_
 optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
 criterion = torch.nn.CrossEntropyLoss()
 
+original_data = None
 for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
-    train_data, train_loader = SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args)
     # train(model, train_loader, device, optimizer, criterion)
+    if epoch == 1:
+        train_data, train_loader, original_train_data = SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args)
+        original_data = original_train_data
+    else:
+        train_data, train_loader, _ = SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args)
 
-    visualize_embeddings(model, train_loader, epoch, args)
+    visualize_embeddings(model, train_loader, epoch, original_data, args)
 
 make_gif(args, image_folder='./figs/embedding_evol')
