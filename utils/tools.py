@@ -227,7 +227,6 @@ def training_data_analysis(fold, train_data, test_data):
 
     print(f'Fold {fold} | train 1: {(train_1) / (train_1 + train_0)} | train 0: {train_0 / (train_1 + train_0)} | test 1: {test_1 / (test_1 + test_0)} | test 0: {test_0 / (test_1 + test_0)} ')
 
-
 def greedy_select_facilities(embeddings, k):
     # Greedy Max-Min selection of k medoids
     selected = []
