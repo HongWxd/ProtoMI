@@ -27,7 +27,7 @@ parser.add_argument('--folds', type=int, default=10, help='fold number of cross 
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
-parser.add_argument('--warm_up_epoch', type=int, default=30, help='self training warm up epoch period')
+parser.add_argument('--warm_up_epoch', type=int, default=1, help='self training warm up epoch period')
 # parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
 # parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
 
@@ -50,14 +50,14 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
         label_0 += (data.y == 0).sum().item()
         label_1 += (data.y == 1).sum().item()
     print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
-    weights = imbalanced_weights(labeled_train_data)
+    weights = imbalanced_weights(labeled_train_data, device)
 
     for i, data in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         criterion = torch.nn.CrossEntropyLoss(weight=weights)
-        loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
+        loss = criterion(out, data.y)# labeled loss
 
         loss.backward()
         optimizer.step()
@@ -69,7 +69,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     if args.training_methods == 'Self_Training':
         if epoch >= args.warm_up_epoch:# Warm up for several epoches
             if total_masked <= pseudo_thr*2:# Control the pseudo samples 
-                labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args)
+                labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args)
                     
     labeled_train_cid_list = [i.cid for i in labeled_train_data]
     unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]

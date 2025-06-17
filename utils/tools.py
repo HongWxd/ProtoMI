@@ -185,7 +185,7 @@ def unlabeled_weight(epoch, T1, T2):
                 alpha = af
         return alpha
 
-def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args):
+def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args):
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
@@ -204,6 +204,11 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 for update_data in update_list:
+                    weights = weights.cpu().numpy()
+                    if weights[0] > weights[1]:
+                        update_data_y = update_data.y.item()
+                        print(update_data_y)
+
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
                     update_data = update_data.cpu()
@@ -276,11 +281,12 @@ def facility_location_loss(embeddings, labels, gamma=1.0):
     loss = torch.clamp(F_S + gamma * delta - gt_loss, min=0.0)
     return loss
 
-def imbalanced_weights(train_data):
+def imbalanced_weights(train_data, device):
     y = []
     for data in train_data:
         y.append(data.y.item())
     weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
+    weights = torch.tensor(weights, dtype=torch.float32).to(device)
 
     return weights
 
