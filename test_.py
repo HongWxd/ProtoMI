@@ -1,19 +1,30 @@
 import os 
 import pandas as pd
+from rdkit import Chem
+import rdkit
+from rdkit.Chem import Descriptors
 
-labeled_data_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
-all_data_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))
+doravirine = Chem.MolFromSmiles('Cn1c(n[nH]c1=O)Cn2ccc(c(c2=O)Oc3cc(cc(c3)Cl)C#N)C(F)(F)F')
 
-# weights = all_data_df['weight'].values.tolist()
-# small = [i for i in weights if 100 <= i <= 200]
-# print(len(small))
+def getMolDescriptors(mol, missingVal=None):
+    ''' calculate the full list of descriptors for a molecule
+    
+        missingVal is used if the descriptor cannot be calculated
+    '''
+    res = {}
+    for nm,fn in Descriptors._descList:
+        print(nm)
+        # some of the descriptor fucntions can throw errors if they fail, catch those here:
+        try:
+            val = fn(mol)
+        except:
+            # print the error message:
+            import traceback
+            traceback.print_exc()
+            # and set the descriptor value to whatever missingVal is
+            val = missingVal
+        res[nm] = val
+    return res
 
-# weights = labeled_data_df['weight'].values.tolist()
-# # small = [i for i in weights if i <= 100]
-# print(max(weights), min(weights))
-
-label = labeled_data_df['label'].values.tolist()
-label_1 = [i for i in label if i == 1]
-label_0 = [i for i in label if i == 0]
-# small = [i for i in weights if i <= 100]
-print(len(label_1), len(label_0))
+res = getMolDescriptors(doravirine)
+print(len(res))

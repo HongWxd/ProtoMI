@@ -6,10 +6,10 @@ from model import GCN, GINE
 from tqdm import tqdm
 import time
 import pickle
-from utils.tools import plot_loss_acc, unlabeled_weight, self_training, facility_location_loss
+from utils.tools import plot_train_results, unlabeled_weight, self_training, facility_location_loss
 from sklearn.model_selection import KFold
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
 import torch.nn.functional as F
 import warnings
 
@@ -92,18 +92,18 @@ def evaluate(model, loader, device, criterion):
     preds = torch.cat(all_preds).numpy()
     labels = torch.cat(all_labels).numpy()
 
-    accuracy = accuracy_score(labels, preds)
+    AUC = roc_auc_score(labels, preds)
     precision = precision_score(labels, preds, average='binary')
     recall = recall_score(labels, preds, average='binary')
     f1 = f1_score(labels, preds, average='binary')
 
-    return accuracy, precision, recall, f1, total_samples, total_loss
+    return AUC, precision, recall, f1, total_samples, total_loss
 
 with open('./data/labeled_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 best_fold = 0
-overall_best_acc = 0
+overall_best_auc = 0
 all_metrics = []
 all_loss_metrics = []
 best_model_state_dict = None
@@ -127,9 +127,9 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 
     total_loss = []
     total_test_loss = []
-    total_test_acc = []
+    total_test_auc = []
     embedding_snapshots = []
-    best_test_acc = 0
+    best_test_auc = 0
     best_test_precision = 0
     best_test_recall = 0
     best_test_f1 = 0
@@ -140,19 +140,19 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
         start_time = time.time()
         total_train_loss, train_samples, total_pseudo_loss, total_pseudo_samples = train(model, train_loader, device, optimizer, criterion, epoch, args)
-        train_accuracy, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device, criterion)
-        test_accuracy, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device, criterion)
+        train_AUC, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device, criterion)
+        test_AUC, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device, criterion)
         end_time = time.time()
         epoch_time = end_time - start_time
 
-        if test_accuracy >= best_test_acc:
+        if test_AUC >= best_test_auc:
             early_stop_counter = 0
-            best_test_acc = test_accuracy
+            best_test_auc = test_AUC
             best_test_precision = test_precision
             best_test_recall = test_recall
             best_test_f1 = test_f1
-            if test_accuracy > overall_best_acc:
-                overall_best_acc = test_accuracy
+            if test_AUC > overall_best_auc:
+                overall_best_auc = test_AUC
                 best_model_state_dict = model.state_dict()
                 best_fold = fold + 1
         else:
@@ -171,24 +171,24 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
         avg_test_loss = test_loss / test_samples
         total_loss.append(avg_train_loss)
         total_test_loss.append(avg_test_loss)
-        total_test_acc.append(test_accuracy)
+        total_test_auc.append(test_AUC)
 
         print(f'Fold: {fold+1} | Epoch: {epoch} | Epoch Time: {epoch_time:.4f} | Train Loss: {avg_train_loss:.4f} | Pseudo Loss: {avg_pseudo_loss:.4f} | Test Loss: {avg_test_loss:.4f}')
-        print(f'Train Acc: {train_accuracy:.4f} | Train Precision: {train_precision:.4f} | Train Recall: {train_recall:.4f} | Train F1: {train_f1:.4f}')
-        print(f'Test Acc: {test_accuracy:.4f} | Test Precision: {test_precision:.4f} | Test Recall: {test_recall:.4f} | Test F1: {test_f1:.4f}')
+        print(f'Train AUC: {train_AUC:.4f} | Train Precision: {train_precision:.4f} | Train Recall: {train_recall:.4f} | Train F1: {train_f1:.4f}')
+        print(f'Test AUC: {test_AUC:.4f} | Test Precision: {test_precision:.4f} | Test Recall: {test_recall:.4f} | Test F1: {test_f1:.4f}')
 
     train_end_time = time.time()
-    print(f'Best Performance for fold {fold + 1}: Test Acc: {best_test_acc:.4f} | Test Precision: {best_test_precision:.4f} | Test Recall: {best_test_recall:.4f} | Test F1: {best_test_f1:.4f} | Total Train Time: {(train_end_time - train_start_time):.4f} ')
+    print(f'Best Performance for fold {fold + 1}: Test AUC: {best_test_auc:.4f} | Test Precision: {best_test_precision:.4f} | Test Recall: {best_test_recall:.4f} | Test F1: {best_test_f1:.4f} | Total Train Time: {(train_end_time - train_start_time):.4f} ')
 
-    best_metrics = (best_test_acc, best_test_precision, best_test_recall, best_test_f1)
+    best_metrics = (best_test_auc, best_test_precision, best_test_recall, best_test_f1)
     all_metrics.append(best_metrics)
-    plot_loss_acc(pratical_epoch, total_loss, total_test_loss, total_test_acc, fold)# plot loss and acc figure
+    plot_train_results(pratical_epoch, total_loss, total_test_loss, total_test_auc, fold)# plot loss and auc figure
 
 all_metrics = np.array(all_metrics)
 mean_metrics = all_metrics.mean(axis=0)
 std_metrics = all_metrics.std(axis=0)
 print(f"\n===== Cross-validation Result =====")
-print(f"Mean Accuracy: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
+print(f"Mean AUCuracy: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f} ± {std_metrics[1]:4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")

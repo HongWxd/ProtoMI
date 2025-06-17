@@ -11,7 +11,7 @@ from sklearn.model_selection import KFold
 from tqdm import tqdm
 from rdkit import Chem
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing import OneHotEncoder
 
 parser = argparse.ArgumentParser(description="Train the machine learning models")
@@ -48,8 +48,7 @@ for smile in new_smiles:
     OneHotSmiles.append(one_hot_smile)
  
 # create a list of fingerprints from mols
-# X = [Chem.RDKFingerprint(mol) for mol in tqdm(mols)]
-X = OneHotSmiles
+X = [Chem.RDKFingerprint(mol) for mol in tqdm(mols)]
 
 best_fold = 0
 all_metrics = []
@@ -63,7 +62,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    args.model = 'DT'
+    args.model = 'XGB'
     if args.model == 'SVM':
         model = SVC(kernel='rbf', C=1.0, gamma='scale', probability=True)
     elif args.model == 'RF':
@@ -79,20 +78,20 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
             eval_metric="logloss", 
             n_estimators=100,
             max_depth=6,
-            learning_rate=0.001,
+            learning_rate=0.0001,
             random_state=42
         )
 
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
 
-    acc = accuracy_score(y_test, y_pred)
+    AUC = roc_auc_score(y_test, y_pred)
     precision = precision_score(y_test, y_pred, average='binary')
     recall = recall_score(y_test, y_pred, average='binary')
     f1 = f1_score(y_test, y_pred, average='binary')
-    print(f'Fold: {fold+1} | Test Acc: {acc:.4f} | Test Precision: {precision:.4f} | Test Recall: {recall:.4f} | Test F1: {f1:.4f}')
+    print(f'Fold: {fold+1} | Test AUC: {AUC:.4f} | Test Precision: {precision:.4f} | Test Recall: {recall:.4f} | Test F1: {f1:.4f}')
 
-    metrics = (acc, precision, recall, f1)
+    metrics = (AUC, precision, recall, f1)
     all_metrics.append(metrics)
 
 all_metrics = np.array(all_metrics)
@@ -100,7 +99,7 @@ mean_metrics = all_metrics.mean(axis=0)
 std_metrics = all_metrics.std(axis=0)
 print(f"\n===== Cross-validation Result =====")
 print(f'Model: {args.model}')
-print(f"Mean Accuracy: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
+print(f"Mean AUC: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f} ± {std_metrics[1]:4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")
