@@ -204,9 +204,6 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 for update_data in update_list:
-                    if update_data.y.item() == 0:
-                        print(update_data.y)
-
                     epoch_weights = weights.cpu().numpy()
                     if epoch_weights[0] > epoch_weights[1] and update_data.y.item() == 1:
                         continue
