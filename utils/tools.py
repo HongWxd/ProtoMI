@@ -204,10 +204,14 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 for update_data in update_list:
-                    weights = weights.cpu().numpy()
-                    if weights[0] > weights[1]:
-                        update_data_y = update_data.y.item()
-                        print(update_data_y)
+                    if update_data.y.item() == 0:
+                        print(update_data.y)
+
+                    epoch_weights = weights.cpu().numpy()
+                    if epoch_weights[0] > epoch_weights[1] and update_data.y.item() == 1:
+                        continue
+                    elif epoch_weights[0] < epoch_weights[1] and update_data.y.item() == 0:
+                        continue
 
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
