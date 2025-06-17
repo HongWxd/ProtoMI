@@ -56,7 +56,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
         data = data.to(device)
         optimizer.zero_grad()
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
-        criterion = torch.nn.CrossEntropyLoss(weights=weights)
+        criterion = torch.nn.CrossEntropyLoss(weight=weights)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
 
         loss.backward()
