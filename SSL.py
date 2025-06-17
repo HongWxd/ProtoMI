@@ -6,7 +6,7 @@ from model import GCN, GINE
 from tqdm import tqdm
 import time
 import pickle
-from utils.tools import plot_train_results, unlabeled_weight, self_training, facility_location_loss, training_data_analysis
+from utils.tools import plot_train_results, unlabeled_weight, self_training, facility_location_loss, training_data_analysis, imbalanced_weights
 from sklearn.model_selection import KFold
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
@@ -34,7 +34,7 @@ parser.add_argument('--warm_up_epoch', type=int, default=30, help='self training
 args = parser.parse_args()
 device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
-def train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args):
+def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     labeled_train_data = [i for i in train_data if i.mask == True]
     unlabeled_train_data = [i for i in train_data if i.mask == False]
     train_loader = DataLoader(labeled_train_data, batch_size=args.batch_size, shuffle=True)
@@ -50,11 +50,13 @@ def train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, ar
         label_0 += (data.y == 0).sum().item()
         label_1 += (data.y == 1).sum().item()
     print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
+    weights = imbalanced_weights(labeled_train_data)
 
     for i, data in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        criterion = torch.nn.CrossEntropyLoss(weights=weights)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
 
         loss.backward()
@@ -75,7 +77,7 @@ def train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, ar
 
     return total_loss, total_samples, train_loader, train_data
 
-def evaluate(model, loader, device, criterion):
+def evaluate(model, loader, device):
     model.eval()
     all_preds = []
     all_labels = []
@@ -88,6 +90,7 @@ def evaluate(model, loader, device, criterion):
 
             data = data.to(device)
             out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            criterion = torch.nn.CrossEntropyLoss()
             loss = criterion(out[data.mask], data.y[data.mask])
 
             pred = out.argmax(dim=1)
@@ -99,7 +102,6 @@ def evaluate(model, loader, device, criterion):
     preds = torch.cat(all_preds).numpy()
     labels = torch.cat(all_labels).numpy()
 
-    # accuracy = accuracy_score(labels, preds)
     auc_score = roc_auc_score(labels, preds)
     precision = precision_score(labels, preds, average='binary')
     recall = recall_score(labels, preds, average='binary')
@@ -139,7 +141,6 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     print(model)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
-    criterion = torch.nn.CrossEntropyLoss()
 
     total_loss = []
     total_test_loss = []
@@ -168,10 +169,10 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
             label_1_list_init.append(label_1)
         
         start_time = time.time()
-        total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr, args)
+        total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, epoch, pseudo_thr, args)
         train_data = update_train_data
-        train_auc, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device, criterion)
-        test_auc, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device, criterion)
+        train_auc, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device)
+        test_auc, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device)
         end_time = time.time()
         epoch_time = end_time - start_time
 

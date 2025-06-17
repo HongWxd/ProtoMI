@@ -11,6 +11,7 @@ from ase import Atoms
 from dscribe.descriptors import SOAP
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import Data
+from sklearn.utils.class_weight import compute_class_weight
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -274,6 +275,15 @@ def facility_location_loss(embeddings, labels, gamma=1.0):
 
     loss = torch.clamp(F_S + gamma * delta - gt_loss, min=0.0)
     return loss
+
+def imbalanced_weights(train_data):
+    y = []
+    for data in train_data:
+        y.append(data.y.item())
+    weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
+
+    return weights
+
 
 def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     epochs = list(range(1, num_epochs))

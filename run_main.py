@@ -31,7 +31,7 @@ parser.add_argument('--T1', type=int, default=1, help='self training warm up epo
 parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
 
 args = parser.parse_args()
-device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
 def train(model, train_loader, device, optimizer, criterion, epoch, args):
     model.train()
@@ -188,7 +188,7 @@ all_metrics = np.array(all_metrics)
 mean_metrics = all_metrics.mean(axis=0)
 std_metrics = all_metrics.std(axis=0)
 print(f"\n===== Cross-validation Result =====")
-print(f"Mean AUCuracy: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
+print(f"Mean AUC: {mean_metrics[0]:.4f} ± {std_metrics[0]:4f}")
 print(f"Mean Precision: {mean_metrics[1]:.4f} ± {std_metrics[1]:4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")

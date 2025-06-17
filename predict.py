@@ -5,6 +5,7 @@ from torch_geometric.loader import DataLoader
 from model import GCN, GINE
 from tqdm import tqdm
 import pandas as pd
+import torch.nn.functional as F
 
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
@@ -18,7 +19,7 @@ parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.9, help='threshold of self training')
+parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data.csv', help='the path of searching space file')
 
 args = parser.parse_args()
@@ -28,6 +29,7 @@ with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 test_data = [i for i in all_data if i.mask == False]
+print(len(test_data))
 test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
 model = GINE(num_node_features=test_data[0].n_node_features, num_edge_features=test_data[0].n_edge_features, 
@@ -42,9 +44,15 @@ with torch.no_grad():
     for data in tqdm(test_loader):
         data = data.to(device)
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        probs = F.softmax(out, dim=-1)
+        print(probs)
+        confs, preds = probs.max(dim=1)
+        high_conf_mask = confs > args.threshold
 
-        pred = out.argmax(dim=1)
-        all_preds[data.cid] = pred.cpu()
+        select_candidates = data[high_conf_mask]
+        print(select_candidates)
+        # pred = out.argmax(dim=1)
+        all_preds[data[high_conf_mask].cid] = select_candidates
 
 
 searching_space_df = pd.DataFrame(pd.read_csv(args.searching_space_path))

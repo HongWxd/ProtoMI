@@ -3,6 +3,8 @@ import pandas as pd
 from rdkit import Chem
 import rdkit
 from rdkit.Chem import Descriptors
+import numpy as np
+
 
 doravirine = Chem.MolFromSmiles('Cn1c(n[nH]c1=O)Cn2ccc(c(c2=O)Oc3cc(cc(c3)Cl)C#N)C(F)(F)F')
 
