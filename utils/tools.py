@@ -275,7 +275,7 @@ def facility_location_loss(embeddings, labels, gamma=1.0):
     loss = torch.clamp(F_S + gamma * delta - gt_loss, min=0.0)
     return loss
 
-def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
+def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     epochs = list(range(1, num_epochs))
 
     plt.figure(figsize=(12, 5))
@@ -290,14 +290,14 @@ def plot_loss_acc(num_epochs, train_loss, total_test_loss, test_accuracy, fold):
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, test_accuracy, marker='o', color='gray', label='Testing Accuracy')
+    plt.plot(epochs, test_auc, marker='o', color='gray', label='Testing AUC')
     plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Testing Accuracy Curve')
+    plt.ylabel('AUC')
+    plt.title('Testing AUC Curve')
     plt.grid(True)
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig(f'./figs/fold_{fold+1}_loss_acc_curve.png', dpi=600)
+    plt.savefig(f'./figs/fold_{fold+1}_loss_AUC_curve.png', dpi=600)
 
 
