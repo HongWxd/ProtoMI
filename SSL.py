@@ -27,7 +27,7 @@ parser.add_argument('--folds', type=int, default=10, help='fold number of cross 
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
-parser.add_argument('--warm_up_epoch', type=int, default=30, help='self training warm up epoch period')
+parser.add_argument('--warm_up_epoch', type=int, default=1, help='self training warm up epoch period')
 # parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
 # parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
 
