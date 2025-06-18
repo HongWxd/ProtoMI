@@ -259,13 +259,10 @@ def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
         balanced_update_list += neg_data
     else:
         if neg_need != 0:
-            print(neg_need)
             _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
             neg_mask = torch.zeros_like(torch.tensor(neg_conf), dtype=torch.bool)
             neg_mask[neg_topk_indices] = True
             select_neg_data = [data for i, data in enumerate(neg_data) if neg_mask[i]]
-            print(neg_mask)
-            print(neg_data)
             balanced_update_list += select_neg_data
 
     return balanced_update_list

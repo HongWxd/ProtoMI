@@ -94,7 +94,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
-        for data in unlabeled_loader:
+        for i, data in enumerate(unlabeled_loader):
             data = data.to(device)
             logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
             probs = F.softmax(logits, dim=-1)
@@ -108,15 +108,12 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 data.mask[high_conf_mask] = True
                 
                 update_list = data[high_conf_mask]
+                confs_list = confs[high_conf_mask]
+                update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data)
                 for update_data in update_list:
-                    epoch_weights = weights.cpu().numpy()
-                    if epoch_weights[0] > epoch_weights[1] and update_data.y.item() == 1:
-                        continue
-                    elif epoch_weights[0] < epoch_weights[1] and update_data.y.item() == 0:
-                        continue
-
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
+                    
                     update_data = update_data.cpu()
                     update_data.mask = update_data.mask.item()
                     update_data.cid = update_data.cid.item()
@@ -127,6 +124,56 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                     labeled_train_data.append(update_data)
     
     return labeled_train_data
+
+def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
+    pos_sample = 0
+    neg_sample = 0
+    for data in labeled_train_data:
+        if data.y == 0:
+            neg_sample += 1
+        elif data.y == 1:
+            pos_sample += 1
+
+    balanced_update_list = []
+    pos_data = []
+    neg_data = []
+    pos_conf = []
+    neg_conf = []
+    for data, confs in zip(update_list, confs_list):
+        if data.y.item() == 1:
+            pos_data.append(data)
+            pos_conf.append(confs)
+        elif data.y.item() == 0:
+            neg_data.append(data)
+            neg_conf.append(confs)
+    
+    pos_need = pseudo_thr - pos_sample
+    neg_need = pseudo_thr - neg_sample
+
+    if pos_need >= len(pos_data):
+        balanced_update_list += pos_data
+    else:
+        if pos_need != 0:
+            _, pos_topk_indices = torch.topk(torch.tensor(pos_conf), pos_need, largest=True)
+            pos_mask = torch.zeros_like(torch.tensor(pos_conf), dtype=torch.bool)
+            pos_mask[pos_topk_indices] = True
+            select_pos_data = [data for i, data in enumerate(pos_data) if pos_mask[i]]
+            balanced_update_list += select_pos_data
+    
+    if neg_need >= len(neg_data):
+        balanced_update_list += neg_data
+    else:
+        if neg_need != 0:
+            print(neg_need)
+            _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
+            neg_mask = torch.zeros_like(torch.tensor(neg_conf), dtype=torch.bool)
+            neg_mask[neg_topk_indices] = True
+            select_neg_data = [data for i, data in enumerate(neg_data) if neg_mask[i]]
+            print(neg_mask)
+            print(neg_data)
+            balanced_update_list += select_neg_data
+
+    return balanced_update_list
 
 def visualize_embeddings(model, dataloader, epoch, original_train_data, args):
     origin_cids = []
