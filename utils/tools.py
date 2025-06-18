@@ -240,6 +240,7 @@ def sample_balancer(update_list, pseudo_thr, confs_list):
     
     pos_need = pseudo_thr - positive_samples
     neg_need = pseudo_thr - negative_samples
+    print('pos', pos_need, 'neg', neg_need)
 
     if pos_need >= len(pos_data):
         balanced_update_list += pos_data
@@ -249,7 +250,7 @@ def sample_balancer(update_list, pseudo_thr, confs_list):
         pos_mask[pos_topk_indices] = True
         select_pos_data = pos_data[pos_mask]
         balanced_update_list += select_pos_data
-        print(select_pos_data)
+        print('add', len(select_pos_data), 'pos')
     
     if neg_need >= len(neg_data):
         balanced_update_list += neg_data
@@ -259,11 +260,7 @@ def sample_balancer(update_list, pseudo_thr, confs_list):
         neg_mask[neg_topk_indices] = True
         select_neg_data = neg_data[neg_mask]
         balanced_update_list += select_neg_data
-        print(select_neg_data)
-        
-    
-    print(balanced_update_list)
-
+        print('add', len(select_neg_data), 'neg')
 
     return balanced_update_list
 
