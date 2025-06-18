@@ -204,7 +204,6 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
-                print('iter:', i)
                 update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data)
                 for update_data in update_list:
                     if len(labeled_train_data) >= pseudo_thr*2:
@@ -245,7 +244,6 @@ def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
     
     pos_need = pseudo_thr - pos_sample
     neg_need = pseudo_thr - neg_sample
-    print('pos', pos_need, 'neg', neg_need)
 
     if pos_need >= len(pos_data):
         balanced_update_list += pos_data
