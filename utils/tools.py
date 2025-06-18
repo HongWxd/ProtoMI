@@ -190,7 +190,6 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
         for i, data in enumerate(unlabeled_loader):
-            print('iter:', i)
             data = data.to(device)
             logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
             probs = F.softmax(logits, dim=-1)
@@ -205,6 +204,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
+                print('iter:', i)
                 update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data)
                 for update_data in update_list:
                     if len(labeled_train_data) >= pseudo_thr*2:
