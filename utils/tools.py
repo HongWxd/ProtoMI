@@ -189,7 +189,8 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
-        for data in unlabeled_loader:
+        for i, data in enumerate(unlabeled_loader):
+            print('iter:', i)
             data = data.to(device)
             logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
             probs = F.softmax(logits, dim=-1)
@@ -255,6 +256,7 @@ def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
         select_pos_data = pos_data[pos_mask]
         balanced_update_list += select_pos_data
         print('add', len(select_pos_data), 'pos')
+        print(balanced_update_list)
     
     if neg_need >= len(neg_data):
         balanced_update_list += neg_data
