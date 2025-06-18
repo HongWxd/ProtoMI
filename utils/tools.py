@@ -203,7 +203,6 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 data.mask[high_conf_mask] = True
                 
                 update_list = data[high_conf_mask]
-                print(update_list)
                 confs_list = confs[high_conf_mask]
                 update_list = sample_balancer(update_list, pseudo_thr, confs_list)
                 for update_data in update_list:
@@ -241,8 +240,6 @@ def sample_balancer(update_list, pseudo_thr, confs_list):
     
     pos_need = pseudo_thr - positive_samples
     neg_need = pseudo_thr - negative_samples
-
-    print(pos_data)
 
     _, pos_topk_indices = torch.topk(torch.tensor(pos_data), pos_need, largest=True)
     pos_mask = torch.zeros_like(pos_data, dtype=torch.bool)
