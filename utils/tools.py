@@ -265,7 +265,7 @@ def training_data_analysis(fold, train_data, test_data):
     test_1 = len([i for i in test_label_set if i.y == 1])
     test_0 = len([i for i in test_label_set if i.y == 0])
 
-    print(f'Fold {fold} | train 1: {(train_1) / (train_1 + train_0)} | train 0: {train_0 / (train_1 + train_0)} | test 1: {test_1 / (test_1 + test_0)} | test 0: {test_0 / (test_1 + test_0)} ')
+    print(f'Fold {fold} | train 1: {(train_1) / (train_1 + train_0):.4f} | train 0: {train_0 / (train_1 + train_0):.4f} | test 1: {test_1 / (test_1 + test_0):.4f} | test 0: {test_0 / (test_1 + test_0):.4f} ')
 
 def greedy_select_facilities(embeddings, k):
     # Greedy Max-Min selection of k medoids
@@ -323,7 +323,7 @@ def imbalanced_weights(train_data, train_loader, epoch, device):
         total_masked += int(data.mask.sum())
         label_0 += (data.y == 0).sum().item()
         label_1 += (data.y == 1).sum().item()
-    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
+    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked:.4f} | label 0: {label_0 / total_masked:.4f} | label 1: {label_1 / total_masked:.4f}")
 
     y = []
     for data in train_data:
