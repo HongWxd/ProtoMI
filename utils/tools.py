@@ -203,15 +203,12 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 data.mask[high_conf_mask] = True
                 
                 update_list = data[high_conf_mask]
+                confs_list = confs[high_conf_mask]
+                update_list = sample_balancer(update_list, pseudo_thr, confs_list)
                 for update_data in update_list:
-                    epoch_weights = weights.cpu().numpy()
-                    if epoch_weights[0] > epoch_weights[1] and update_data.y.item() == 1:
-                        continue
-                    elif epoch_weights[0] < epoch_weights[1] and update_data.y.item() == 0:
-                        continue
-
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
+                    
                     update_data = update_data.cpu()
                     update_data.mask = update_data.mask.item()
                     update_data.cid = update_data.cid.item()
@@ -222,6 +219,42 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                     labeled_train_data.append(update_data)
     
     return labeled_train_data
+
+def sample_balancer(update_list, pseudo_thr, confs_list):
+    balanced_update_list = []
+    positive_samples = 0
+    negative_samples = 0
+    pos_data = []
+    neg_data = []
+    pos_conf = []
+    neg_conf = []
+    for data, confs in zip(update_list, confs_list):
+        if data.y.item() == 1:
+            positive_samples += 1
+            pos_data.append(data)
+            pos_conf.append(confs)
+        elif data.y.item() == 0:
+            negative_samples += 1
+            neg_data.append(data)
+            neg_conf.append(confs)
+    
+    pos_need = pseudo_thr - positive_samples
+    neg_need = pseudo_thr - negative_samples
+
+    _, pos_topk_indices = torch.topk(pos_data, pos_need, largest=True)
+    pos_mask = torch.zeros_like(pos_data, dtype=torch.bool)
+    pos_mask[pos_topk_indices] = True
+    _, neg_topk_indices = torch.topk(neg_data, neg_need, largest=True)
+    neg_mask = torch.zeros_like(neg_data, dtype=torch.bool)
+    neg_mask[neg_topk_indices] = True
+
+    select_pos_data = pos_data[pos_mask]
+    select_neg_data = neg_data[neg_mask]
+
+    print(select_pos_data, select_neg_data)
+
+
+    return balanced_update_list
 
 def training_data_analysis(fold, train_data, test_data):
     train_label_set = [i for i in train_data if i.mask == True]
@@ -282,14 +315,23 @@ def facility_location_loss(embeddings, labels, gamma=1.0):
     loss = torch.clamp(F_S + gamma * delta - gt_loss, min=0.0)
     return loss
 
-def imbalanced_weights(train_data, device):
+def imbalanced_weights(train_data, train_loader, epoch, device):
+    total_masked = 0
+    label_0 = 0
+    label_1 = 0
+    for data in train_loader:
+        total_masked += int(data.mask.sum())
+        label_0 += (data.y == 0).sum().item()
+        label_1 += (data.y == 1).sum().item()
+    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
+
     y = []
     for data in train_data:
         y.append(data.y.item())
     weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
     weights = torch.tensor(weights, dtype=torch.float32).to(device)
 
-    return weights
+    return total_masked, weights
 
 
 def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):

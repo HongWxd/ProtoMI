@@ -13,6 +13,7 @@ from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool, GINEC
 from sklearn.model_selection import train_test_split
 import imageio.v2 as imageio
 import os
+from sklearn.utils.class_weight import compute_class_weight
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
@@ -80,7 +81,16 @@ class GCN_with_edge_attr(torch.nn.Module):
         x = self.lin(x)
         return x
 
-def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args):
+def imbalanced_weights(train_data, device):
+    y = []
+    for data in train_data:
+        y.append(data.y.item())
+    weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
+    weights = torch.tensor(weights, dtype=torch.float32).to(device)
+
+    return weights
+
+def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args):
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
@@ -99,6 +109,12 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 for update_data in update_list:
+                    epoch_weights = weights.cpu().numpy()
+                    if epoch_weights[0] > epoch_weights[1] and update_data.y.item() == 1:
+                        continue
+                    elif epoch_weights[0] < epoch_weights[1] and update_data.y.item() == 0:
+                        continue
+
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
                     update_data = update_data.cpu()
@@ -199,6 +215,7 @@ def SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr
         label_0 += (data.y == 0).sum().item()
         label_1 += (data.y == 1).sum().item()
     print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
+    weights = imbalanced_weights(labeled_train_data, device)
 
     for i, data in enumerate(train_loader):
         data = data.to(device)
@@ -215,7 +232,7 @@ def SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr
     
     if epoch >= args.warm_up_epoch:# Warm up for several epoches
         if total_masked <= pseudo_thr*2:# Control the pseudo samples 
-            labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, args)
+            labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args)
                     
     labeled_train_cid_list = [i.cid for i in labeled_train_data]
     unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]

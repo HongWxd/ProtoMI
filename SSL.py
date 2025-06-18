@@ -42,15 +42,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     model.train()
     total_loss = 0
     total_samples = 0
-    total_masked = 0
-    label_0 = 0
-    label_1 = 0
-    for data in train_loader:
-        total_masked += int(data.mask.sum())
-        label_0 += (data.y == 0).sum().item()
-        label_1 += (data.y == 1).sum().item()
-    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked} | label 1: {label_1 / total_masked}")
-    weights = imbalanced_weights(labeled_train_data, device)
+    total_masked, weights = imbalanced_weights(labeled_train_data, train_loader, epoch, device)
 
     for i, data in enumerate(train_loader):
         data = data.to(device)
