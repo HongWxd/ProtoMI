@@ -323,7 +323,7 @@ def imbalanced_weights(train_data, train_loader, epoch, device):
         total_masked += int(data.mask.sum())
         label_0 += (data.y == 0).sum().item()
         label_1 += (data.y == 1).sum().item()
-    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked:.4f} | label 0: {label_0 / total_masked:.4f} | label 1: {label_1 / total_masked:.4f}")
+    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked:.4f} | label 1: {label_1 / total_masked:.4f}")
 
     y = []
     for data in train_data:
@@ -332,7 +332,6 @@ def imbalanced_weights(train_data, train_loader, epoch, device):
     weights = torch.tensor(weights, dtype=torch.float32).to(device)
 
     return total_masked, weights
-
 
 def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     epochs = list(range(1, num_epochs))
