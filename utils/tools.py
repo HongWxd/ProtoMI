@@ -241,17 +241,28 @@ def sample_balancer(update_list, pseudo_thr, confs_list):
     pos_need = pseudo_thr - positive_samples
     neg_need = pseudo_thr - negative_samples
 
-    _, pos_topk_indices = torch.topk(torch.tensor(pos_conf), pos_need, largest=True)
-    pos_mask = torch.zeros_like(pos_conf, dtype=torch.bool)
-    pos_mask[pos_topk_indices] = True
-    _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
-    neg_mask = torch.zeros_like(neg_conf, dtype=torch.bool)
-    neg_mask[neg_topk_indices] = True
-
-    select_pos_data = pos_data[pos_mask]
-    select_neg_data = neg_data[neg_mask]
-
-    print(select_pos_data, select_neg_data)
+    if pos_need >= len(pos_data):
+        balanced_update_list += pos_data
+    else:
+        _, pos_topk_indices = torch.topk(torch.tensor(pos_conf), pos_need, largest=True)
+        pos_mask = torch.zeros_like(pos_conf, dtype=torch.bool)
+        pos_mask[pos_topk_indices] = True
+        select_pos_data = pos_data[pos_mask]
+        balanced_update_list += select_pos_data
+        print(select_pos_data)
+    
+    if neg_need >= len(neg_data):
+        balanced_update_list += neg_data
+    else:
+        _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
+        neg_mask = torch.zeros_like(neg_conf, dtype=torch.bool)
+        neg_mask[neg_topk_indices] = True
+        select_neg_data = neg_data[neg_mask]
+        balanced_update_list += select_neg_data
+        print(select_neg_data)
+        
+    
+    print(balanced_update_list)
 
 
     return balanced_update_list
