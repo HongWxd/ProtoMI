@@ -241,11 +241,11 @@ def sample_balancer(update_list, pseudo_thr, confs_list):
     pos_need = pseudo_thr - positive_samples
     neg_need = pseudo_thr - negative_samples
 
-    _, pos_topk_indices = torch.topk(torch.tensor(pos_data), pos_need, largest=True)
-    pos_mask = torch.zeros_like(pos_data, dtype=torch.bool)
+    _, pos_topk_indices = torch.topk(torch.tensor(pos_conf), pos_need, largest=True)
+    pos_mask = torch.zeros_like(pos_conf, dtype=torch.bool)
     pos_mask[pos_topk_indices] = True
-    _, neg_topk_indices = torch.topk(torch.tensor(neg_data), neg_need, largest=True)
-    neg_mask = torch.zeros_like(neg_data, dtype=torch.bool)
+    _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
+    neg_mask = torch.zeros_like(neg_conf, dtype=torch.bool)
     neg_mask[neg_topk_indices] = True
 
     select_pos_data = pos_data[pos_mask]
