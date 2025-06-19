@@ -45,12 +45,13 @@ with torch.no_grad():
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         probs = F.softmax(out, dim=-1)
         confs, preds = probs.max(dim=1)
-        print(confs, preds)
         high_conf_mask = confs > args.threshold
 
-        select_candidates = data[high_conf_mask]
+        select_candidates = preds[high_conf_mask]
+        print(select_candidates)
         for candidate in select_candidates:
-            all_preds[candidate.cid] = candidate.y
+            print(candidate.y.item())
+            all_preds[candidate.cid.item()] = candidate.y.item()
         
         break
 
