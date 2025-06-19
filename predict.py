@@ -19,7 +19,7 @@ parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0, help='threshold of self training')
+parser.add_argument('--threshold', type=float, default=0.99, help='threshold of self training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data.csv', help='the path of searching space file')
 
 args = parser.parse_args()
@@ -47,13 +47,10 @@ with torch.no_grad():
         confs, preds = probs.max(dim=1)
         high_conf_mask = confs > args.threshold
 
-        select_candidates = preds[high_conf_mask]
-        print(select_candidates)
-        for candidate in select_candidates:
-            print(candidate.y.item())
-            all_preds[candidate.cid.item()] = candidate.y.item()
-        
-        break
+        select_preds = preds[high_conf_mask]
+        select_data = data[high_conf_mask]
+        for data, pred in zip(select_data, select_preds):
+            all_preds[data.cid] = pred
 
 searching_space_df = pd.DataFrame(pd.read_csv(args.searching_space_path))
 cids_list_1 = []
@@ -64,32 +61,32 @@ cids_list_0 = []
 formulas_0 = []
 smiles_0 = []
 weight_0 = []
-for cids, preds in all_preds.items():
-    for cid, pred in zip(cids, preds):
-        cid = cid.item()
-        pred = pred.item()
-        formula = searching_space_df.loc[searching_space_df['cid'] == cid, 'formula'].values[0]
-        smile = searching_space_df.loc[searching_space_df['cid'] == cid, 'SMILES'].values[0]
-        weight = searching_space_df.loc[searching_space_df['cid'] == cid, 'weight'].values[0]
+for cid, pred in all_preds.items():
+    # for cid, pred in zip(cids, preds):
+    cid = cid.item()
+    pred = pred.item()
+    formula = searching_space_df.loc[searching_space_df['cid'] == cid, 'formula'].values[0]
+    smile = searching_space_df.loc[searching_space_df['cid'] == cid, 'SMILES'].values[0]
+    weight = searching_space_df.loc[searching_space_df['cid'] == cid, 'weight'].values[0]
 
-        if pred != 1:
-            cids_list_0.append(cid)
-            formulas_0.append(formula)
-            smiles_0.append(smile)
-            weight_0.append(weight)
-        else:
-            cids_list_1.append(cid)
-            formulas_1.append(formula)
-            smiles_1.append(smile)
-            weight_1.append(weight)
+    if pred != 1:
+        cids_list_0.append(cid)
+        formulas_0.append(formula)
+        smiles_0.append(smile)
+        weight_0.append(weight)
+    else:
+        cids_list_1.append(cid)
+        formulas_1.append(formula)
+        smiles_1.append(smile)
+        weight_1.append(weight)
 
 pred_1_df = pd.DataFrame()
 pred_1_df['cid'] = cids_list_1
 pred_1_df['formula'] = formulas_1
 pred_1_df['smile'] = smiles_1
 pred_1_df['weight'] = weight_1
-# pred_1_df = pred_1_df[pred_1_df['weight'] <= 200]
-# pred_1_df = pred_1_df[pred_1_df['weight'] >= 100]
+pred_1_df = pred_1_df[pred_1_df['weight'] <= 500]
+pred_1_df = pred_1_df[pred_1_df['weight'] >= 100]
 pred_1_df.to_csv('./data/predict_1.csv', index=False)
 
 pred_0_df = pd.DataFrame()

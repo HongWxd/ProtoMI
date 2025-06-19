@@ -225,5 +225,9 @@ print(f'Mean Label Samples Init: {np.mean(label_mask_list_init)}')
 print(f'Mean Label Samples Last: {np.mean(label_mask_list_last)}')
 print(f'Best fold: {best_fold}')
 
+model_df = pd.DataFrame(all_metrics)
+model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
+model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_data.csv', index=False)
+
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')

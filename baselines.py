@@ -13,6 +13,7 @@ from rdkit import Chem
 import xgboost as xgb
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing import OneHotEncoder
+import pandas as pd
 
 parser = argparse.ArgumentParser(description="Train the machine learning models")
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
@@ -78,7 +79,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
             eval_metric="logloss", 
             n_estimators=100,
             max_depth=6,
-            learning_rate=0.0001,
+            learning_rate=0.001,
             random_state=42
         )
 
@@ -104,3 +105,6 @@ print(f"Mean Precision: {mean_metrics[1]:.4f} ± {std_metrics[1]:4f}")
 print(f"Mean Recall: {mean_metrics[2]:.4f} ± {std_metrics[2]:4f}")
 print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")
 print(f'Best fold: {best_fold+1}')
+model_df = pd.DataFrame(all_metrics)
+model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
+model_df.to_csv(f'./plot_scripts/plot_data/{args.model}_data.csv', index=False)
