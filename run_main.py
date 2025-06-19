@@ -6,7 +6,7 @@ from model import GCN, GINE
 from tqdm import tqdm
 import time
 import pickle
-from utils.tools import plot_train_results, unlabeled_weight, self_training, facility_location_loss
+from utils.tools import plot_train_results, self_training, facility_location_loss
 from sklearn.model_selection import KFold
 import numpy as np
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score

@@ -176,15 +176,6 @@ def get_statistical_values(x_smiles):
 
     return all_masses, all_vdw, all_covalent
 
-def unlabeled_weight(epoch, T1, T2):
-        alpha = 0.0
-        af = 3
-        if epoch > T1:
-            alpha = (epoch-T1) / (T2-T1)*af
-            if epoch > T2:
-                alpha = af
-        return alpha
-
 def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args):
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
