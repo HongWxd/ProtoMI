@@ -40,7 +40,7 @@ df = pd.DataFrame({
 plt.figure(figsize=(8, 5))
 plt.figure(figsize=(8, 5))
 palette = sns.color_palette("Spectral", n_colors=7)
-sns.violinplot(x="Model", y="AUC", data=df, palette=palette, inner_kws=dict(box_width=4, whis_width=2, color=".15"))
+sns.violinplot(x="Model", y="AUC", data=df, palette=palette, inner_kws=dict(box_width=4, whis_width=2, color=".5"))
 sns.stripplot(x="Model", y="AUC", data=df, color='black', size=6, jitter=True, alpha=0.7)
 plt.title("AUC Score in Different Model after 10-folds Cross Validation")
 plt.grid(axis="y", linestyle="--", alpha=0.8)

@@ -13,15 +13,15 @@ test_data_path = './data/test_data.pkl'
 all_data_path = './data/all_data.pkl'
 
 # load the dataset
-dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=True)
-with open('./data/baseline_data.pkl', 'wb') as f:
-    pickle.dump(dataset.data, f)
+dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=False)
+# with open('./data/baseline_data.pkl', 'wb') as f:
+#     pickle.dump(dataset.data, f)
 
 
 
-# # preprocess the graph pairs for matric learning
-# with open('./data/all_data.pkl', 'rb') as file:
-#     all_data = pickle.load(file)
+# preprocess the graph pairs for matric learning
+with open('./data/all_data.pkl', 'rb') as file:
+    all_data = pickle.load(dataset.data)
     
 # graph_index_list = list(range(len(all_data)))
 # index_pairs = itertools.combinations(graph_index_list, 2)
