@@ -9,6 +9,7 @@ RF_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/RF_data.csv'))
 SVM_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/SVM_data.csv'))
 GCN_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GCN_data.csv'))
 GINE_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GINE_data.csv'))
+GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GINE_SSL_data.csv'))
 
 xgb_auc = XGBoost_data['AUC'].values.tolist()
 gp_auc = GP_data['AUC'].values.tolist()
@@ -17,8 +18,9 @@ rf_auc = RF_data['AUC'].values.tolist()
 svm_auc = SVM_data['AUC'].values.tolist()
 gcn_auc = GCN_data['AUC'].values.tolist()
 gine_auc = GINE_data['AUC'].values.tolist()
+gine_ssl_auc = GINE_SSL_data['AUC'].values.tolist()
 
-auc_all = gp_auc + dt_auc + rf_auc + svm_auc + gcn_auc + gine_auc
+auc_all = gp_auc + dt_auc + rf_auc + svm_auc + gcn_auc + gine_auc + gine_ssl_auc
 model_all = (
     # ["XGBoost"] * len(xgb_auc) +
     ["GP"] * len(gp_auc) +
@@ -26,7 +28,8 @@ model_all = (
     ["RF"] * len(rf_auc) +
     ['SVM'] * len(svm_auc) + 
     ["GCN"] * len(gcn_auc) + 
-    ["GINE"] * len(gine_auc)
+    ["GINE"] * len(gine_auc) + 
+    ["GINE_SSL"] * len(gine_ssl_auc)
 )
 
 df = pd.DataFrame({
@@ -35,7 +38,10 @@ df = pd.DataFrame({
 })
 
 plt.figure(figsize=(8, 5))
-sns.violinplot(x="Model", y="AUC", data=df, palette=sns.color_palette("Spectral"))
+plt.figure(figsize=(8, 5))
+palette = sns.color_palette("Spectral", n_colors=7)
+sns.violinplot(x="Model", y="AUC", data=df, palette=palette, inner_kws=dict(box_width=15, whis_width=2, color=".8"))
+# sns.stripplot(x="Model", y="AUC", data=df, color="black", size=3, jitter=True, alpha=0.7)
 plt.title("AUC Score in Different Model after 10-folds Cross Validation")
 plt.grid(axis="y", linestyle="--", alpha=0.4)
 plt.tight_layout()

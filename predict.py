@@ -19,7 +19,7 @@ parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout
 parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.99, help='threshold of self training')
+parser.add_argument('--threshold', type=float, default=1.0, help='threshold of self training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data.csv', help='the path of searching space file')
 
 args = parser.parse_args()
@@ -45,7 +45,7 @@ with torch.no_grad():
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         probs = F.softmax(out, dim=-1)
         confs, preds = probs.max(dim=1)
-        high_conf_mask = confs > args.threshold
+        high_conf_mask = confs >= args.threshold
 
         select_preds = preds[high_conf_mask]
         select_data = data[high_conf_mask]
