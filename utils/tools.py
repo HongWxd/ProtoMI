@@ -122,7 +122,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
     n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
 
     # get descriptors
-    soap_descriptor = get_SOAP_descriptor(mol)
+    # soap_descriptor = get_SOAP_descriptor(mol, vdw_max)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
     X = np.zeros((n_nodes, n_node_features))

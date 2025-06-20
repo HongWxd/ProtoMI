@@ -14,14 +14,19 @@ all_data_path = './data/all_data.pkl'
 
 # load the dataset
 dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=False)
+labeled_data = dataset.save_labeled_data()
 # with open('./data/baseline_data.pkl', 'wb') as f:
 #     pickle.dump(dataset.data, f)
+with open('./data/all_data.pkl', 'wb') as file:
+    pickle.dump(dataset.data, file)
 
+with open('./data/labeled_data.pkl', 'wb') as file:
+    pickle.dump(labeled_data, file)
 
 
 # preprocess the graph pairs for matric learning
-with open('./data/all_data.pkl', 'rb') as file:
-    all_data = pickle.load(dataset.data)
+# with open('./data/all_data.pkl', 'wb') as file:
+#     all_data = pickle.load(dataset.data)
     
 # graph_index_list = list(range(len(all_data)))
 # index_pairs = itertools.combinations(graph_index_list, 2)

@@ -63,7 +63,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    args.model = 'XGB'
+    args.model = 'SVM'
     if args.model == 'SVM':
         model = SVC(kernel='rbf', C=1.0, gamma='scale', probability=True)
     elif args.model == 'RF':
