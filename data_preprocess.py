@@ -17,11 +17,17 @@ dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is
 labeled_data = dataset.save_labeled_data()
 # with open('./data/baseline_data.pkl', 'wb') as f:
 #     pickle.dump(dataset.data, f)
-with open('./data/all_data.pkl', 'wb') as file:
+with open('./data/all_data_descriptors.pkl', 'wb') as file:
     pickle.dump(dataset.data, file)
 
-with open('./data/labeled_data.pkl', 'wb') as file:
-    pickle.dump(labeled_data, file)
+# with open('./data/labeled_data.pkl', 'wb') as file:
+#     pickle.dump(labeled_data, file)
+
+
+
+
+
+
 
 
 # preprocess the graph pairs for matric learning

@@ -15,7 +15,6 @@ def getMolDescriptors(mol, missingVal=None):
     '''
     res = {}
     for nm,fn in Descriptors._descList:
-        print(nm)
         # some of the descriptor fucntions can throw errors if they fail, catch those here:
         try:
             val = fn(mol)
@@ -29,4 +28,4 @@ def getMolDescriptors(mol, missingVal=None):
     return res
 
 res = getMolDescriptors(doravirine)
-print(len(res))
+print((res))

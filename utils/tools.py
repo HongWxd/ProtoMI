@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import Descriptors
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
@@ -107,11 +108,29 @@ def get_SOAP_descriptor(mol, vdw_max):
 
     return soap_descriptor
 
+def getMolDescriptors(mol, missingVal=None):
+    ''' calculate the full list of descriptors for a molecule
+        missingVal is used if the descriptor cannot be calculated
+    '''
+    res = {}
+    for nm,fn in Descriptors._descList:
+        # some of the descriptor fucntions can throw errors if they fail, catch those here:
+        try:
+            val = fn(mol)
+        except:
+            # print the error message:
+            import traceback
+            traceback.print_exc()
+            # and set the descriptor value to whatever missingVal is
+            val = missingVal
+        res[nm] = val
+    return res
+
 def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None
 
     # get feature dimensions
     n_nodes = mol.GetNumAtoms()
@@ -122,6 +141,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
     n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
 
     # get descriptors
+    descriptors = getMolDescriptors(mol)
     # soap_descriptor = get_SOAP_descriptor(mol, vdw_max)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
@@ -159,7 +179,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
     n_node_features = n_node_features
     n_edge_features = n_edge_features
 
-    return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
+    return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors
 
 def get_statistical_values(x_smiles):
     mol = Chem.MolFromSmiles(x_smiles)
@@ -195,7 +215,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
-                update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data)
+                # update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data) # balance the unlabeled samples
                 for update_data in update_list:
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue

@@ -24,8 +24,8 @@ def plot_ball_stick():
     cids = set(df['cid'].values.tolist())
 
     for cid, smile, i in zip(tqdm(cids), smiles_list, range(1, len(cids) + 1)):
-        if i == 200:
-            break
+        # if i == 200:
+        #     break
 
         try:
             mol = read_smiles(smile)
@@ -39,26 +39,26 @@ def plot_ball_stick():
         plt.tight_layout()
         plt.savefig(f'./figs/ball_stick_1/{cid}.png', dpi=300)
 
-    # plot possible SEI unrelated molecule
-    df = pd.DataFrame(pd.read_csv('./data/predict_0.csv'))
-    smiles_list = set(df['smile'].values.tolist())
-    cids = set(df['cid'].values.tolist())
+    # # plot possible SEI unrelated molecule
+    # df = pd.DataFrame(pd.read_csv('./data/predict_0.csv'))
+    # smiles_list = set(df['smile'].values.tolist())
+    # cids = set(df['cid'].values.tolist())
 
-    for cid, smile, i in zip(tqdm(cids), smiles_list, range(1, len(cids) + 1)):
-        if i == 200:
-            break
+    # for cid, smile, i in zip(tqdm(cids), smiles_list, range(1, len(cids) + 1)):
+    #     if i == 200:
+    #         break
 
-        try:
-            mol = read_smiles(smile)
-        except:
-            continue
+    #     try:
+    #         mol = read_smiles(smile)
+    #     except:
+    #         continue
 
-        plt.clf()
-        elements = nx.get_node_attributes(mol, name = "element")
-        nx.draw(mol, with_labels=True, labels = elements, pos=nx.spring_layout(mol))
-        plt.gca().set_aspect('equal')
-        plt.tight_layout()
-        plt.savefig(f'./figs/ball_stick_0/{cid}.png', dpi=300)
+    #     plt.clf()
+    #     elements = nx.get_node_attributes(mol, name = "element")
+    #     nx.draw(mol, with_labels=True, labels = elements, pos=nx.spring_layout(mol))
+    #     plt.gca().set_aspect('equal')
+    #     plt.tight_layout()
+    #     plt.savefig(f'./figs/ball_stick_0/{cid}.png', dpi=300)
 
 def plot_distribution():
     df_1 = pd.DataFrame(pd.read_csv('./data/predict_1.csv'))
@@ -139,5 +139,5 @@ def plot_distribution():
     plt.tight_layout()
     plt.savefig('./figs/predict_t-SNE.jpg', dpi=600)
 
-# plot_ball_stick()
-plot_distribution()
+plot_ball_stick()
+# plot_distribution()
