@@ -215,7 +215,8 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
-                # update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data) # balance the unlabeled samples
+                if args.training_methods == 'Self_Training':
+                    update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data) # balance the unlabeled samples
                 for update_data in update_list:
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
