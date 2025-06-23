@@ -23,13 +23,13 @@ parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learnin
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
+parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
 parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
-parser.add_argument('--warm_up_epoch', type=int, default=30, help='self training warm up epoch period')
-# parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
-# parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
+parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
+parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
+parser.add_argument('--embed_dim', type=int, default=217*256, help='Embedding dimension of attention')
+parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 
 args = parser.parse_args()
 device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
@@ -48,7 +48,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     for i, data in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors, args)
         criterion = torch.nn.CrossEntropyLoss(weight=weights)
         loss = criterion(out, data.y)# labeled loss
 
@@ -82,7 +82,7 @@ def evaluate(model, loader, device):
                 continue
 
             data = data.to(device)
-            out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors, args)
             criterion = torch.nn.CrossEntropyLoss()
             loss = criterion(out[data.mask], data.y[data.mask])
 
@@ -162,6 +162,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
             label_1_list_init.append(label_1)
         
         start_time = time.time()
+        args.embed_dim = args.hidden_channels * 217
         total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, epoch, pseudo_thr, args)
         train_data = update_train_data
         train_auc, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device)

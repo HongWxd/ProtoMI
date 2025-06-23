@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch.nn import Linear, Dropout, Sequential, ReLU
+from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention
 from torch_geometric.nn import GCNConv, GINEConv, global_mean_pool
 
 class GCN(torch.nn.Module):
@@ -81,9 +81,9 @@ class GINE_descriptor(torch.nn.Module):
         self.lin2 = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
-    def forward(self, x, edge_index, edge_attr, batch, descriptors):
-        print(x.shape, edge_index.shape, edge_attr.shape, batch.shape, descriptors.shape)
+        self.desp_embed = Linear()
 
+    def forward(self, x, edge_index, edge_attr, batch, descriptors, args):
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
         x = self.dropout(x)
@@ -97,7 +97,9 @@ class GINE_descriptor(torch.nn.Module):
         x = self.dropout(x)
 
         x = global_mean_pool(x, batch)# [batchsize, hidden_channels]
-        print(x.shape)
+        multihead_attn = MultiheadAttention(args.embed_dim, args.num_heads)
+        desp_embed = self.desp_embed(descriptors) # [batchsize, num_desp_features] --> [batchsize, num_desp_features*hidden_channels]
+        x, _ = multihead_attn(x, desp_embed, desp_embed)
 
         x = self.lin1(x)
         x = F.relu(x)

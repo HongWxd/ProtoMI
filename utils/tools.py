@@ -203,7 +203,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     with torch.no_grad():
         for i, data in enumerate(unlabeled_loader):
             data = data.to(device)
-            logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
+            logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors, args)
             probs = F.softmax(logits, dim=-1)
             confs, preds = probs.max(dim=1)
             high_conf_mask = confs > args.threshold
