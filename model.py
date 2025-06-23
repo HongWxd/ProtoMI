@@ -102,13 +102,15 @@ class GINE_descriptor(torch.nn.Module):
         desp_embed = self.desp_embed(descriptors) # [batchsize, num_desp_features] --> [batchsize, num_desp_features*hidden_channels]
         x = x.unsqueeze(1)  # [B, 1, hidden_channels]
         desp_embed = desp_embed.unsqueeze(1)  # [B, 1, hidden_channels]
-        
+
         x, _ = self.multihead_attn(x, desp_embed, desp_embed)
-        print(x)
+        print(x.shape)
 
         x = self.lin1(x)
         x = F.relu(x)
         x = self.dropout(x)
         x = self.lin2(x)
+        x = x.squeeze(1)
+        print(x.shape)
 
         return x
