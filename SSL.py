@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN, GINE
+from model import GCN, GINE, GINE_descriptor
 from tqdm import tqdm
 import time
 import pickle
@@ -47,7 +47,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     for i, data in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         criterion = torch.nn.CrossEntropyLoss(weight=weights)
         loss = criterion(out, data.y)# labeled loss
 
@@ -81,7 +81,7 @@ def evaluate(model, loader, device):
                 continue
 
             data = data.to(device)
-            out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             criterion = torch.nn.CrossEntropyLoss()
             loss = criterion(out[data.mask], data.y[data.mask])
 
@@ -119,7 +119,6 @@ kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
 for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     print(f'===== Fold {fold+1} =====')
     train_data = [all_data[i] for i in train_idx]
-    print(train_data[0])
     test_data = [all_data[i] for i in test_idx]
     training_data_analysis(fold+1, train_data, test_data)# print the label ratio during training
     pseudo_thr = len([i for i in train_data if i.mask == True])
@@ -127,7 +126,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GINE(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout).to(device)
 
@@ -228,7 +227,7 @@ print(f'Best fold: {best_fold}')
 
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_descriptor_data.csv', index=False)
 
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
