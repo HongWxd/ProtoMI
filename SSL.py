@@ -28,7 +28,7 @@ parser.add_argument('--patience', type=int, default=15, help='Patience for early
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
-parser.add_argument('--embed_dim', type=int, default=856, help='Embedding dimension of attention')
+parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
@@ -38,7 +38,6 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     labeled_train_data = [i for i in train_data if i.mask == True]
     unlabeled_train_data = [i for i in train_data if i.mask == False]
-    print(labeled_train_data[0].x.shape, labeled_train_data[0].descriptors.shape)
     train_loader = DataLoader(labeled_train_data, batch_size=args.batch_size, shuffle=True)
 
     model.train()
