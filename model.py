@@ -66,7 +66,7 @@ class GINE(torch.nn.Module):
 
 class GINE_descriptor(torch.nn.Module):
     def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
-        super(GINE, self).__init__()
+        super(GINE_descriptor, self).__init__()
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv1 = GINEConv(nn1, edge_dim=num_edge_features)
@@ -82,6 +82,8 @@ class GINE_descriptor(torch.nn.Module):
         self.dropout = Dropout(dropout)
 
     def forward(self, x, edge_index, edge_attr, batch, descriptors):
+        print(x.shape, edge_index.shape, edge_attr.shape, batch.shape, descriptors.shape)
+
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
         x = self.dropout(x)
@@ -94,9 +96,8 @@ class GINE_descriptor(torch.nn.Module):
         x = F.relu(x)
         x = self.dropout(x)
 
-        x = global_mean_pool(x, batch)
-
-        print(descriptors.shape)
+        x = global_mean_pool(x, batch)# [batchsize, hidden_channels]
+        print(x.shape)
 
         x = self.lin1(x)
         x = F.relu(x)

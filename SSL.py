@@ -37,6 +37,7 @@ device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     labeled_train_data = [i for i in train_data if i.mask == True]
     unlabeled_train_data = [i for i in train_data if i.mask == False]
+    print(labeled_train_data[0].x.shape, labeled_train_data[0].descriptors.shape)
     train_loader = DataLoader(labeled_train_data, batch_size=args.batch_size, shuffle=True)
 
     model.train()

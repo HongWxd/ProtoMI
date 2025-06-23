@@ -46,9 +46,9 @@ class MoleculeDataset(Dataset):
 
             # get the mask for semi-supervised learning
             if cid in labeled_cid_list:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, descriptors = descriptors)
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, descriptors = descriptors.unsqueeze(0))
             else:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, descriptors = descriptors)
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, descriptors = descriptors.unsqueeze(0))
             
             print(graph_data)
             data_list.append(graph_data)
