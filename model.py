@@ -65,7 +65,7 @@ class GINE(torch.nn.Module):
         return x
 
 class GINE_descriptor(torch.nn.Module):
-    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
         super(GINE_descriptor, self).__init__()
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
@@ -77,11 +77,12 @@ class GINE_descriptor(torch.nn.Module):
         nn3 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv3 = GINEConv(nn3, edge_dim=num_edge_features)
 
+        self.multihead_attn = MultiheadAttention(args.embed_dim, args.num_heads)
+        self.desp_embed = Linear(args.desp_dim * args.hidden_channels, args.hidden_channels)
+
         self.lin1 = Linear(hidden_channels, hidden_channels)
         self.lin2 = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
-
-        self.desp_embed = Linear()
 
     def forward(self, x, edge_index, edge_attr, batch, descriptors, args):
         x = self.conv1(x, edge_index, edge_attr)
@@ -97,9 +98,10 @@ class GINE_descriptor(torch.nn.Module):
         x = self.dropout(x)
 
         x = global_mean_pool(x, batch)# [batchsize, hidden_channels]
-        multihead_attn = MultiheadAttention(args.embed_dim, args.num_heads)
+        
         desp_embed = self.desp_embed(descriptors) # [batchsize, num_desp_features] --> [batchsize, num_desp_features*hidden_channels]
-        x, _ = multihead_attn(x, desp_embed, desp_embed)
+        x, _ = self.multihead_attn(x, desp_embed, desp_embed)
+        print(x.shape)
 
         x = self.lin1(x)
         x = F.relu(x)

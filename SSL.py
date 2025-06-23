@@ -30,6 +30,7 @@ parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of 
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
 parser.add_argument('--embed_dim', type=int, default=217*256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
+parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
 args = parser.parse_args()
 device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
@@ -129,7 +130,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 
     model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout).to(device)
+            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
     print(model)
 
@@ -162,7 +163,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
             label_1_list_init.append(label_1)
         
         start_time = time.time()
-        args.embed_dim = args.hidden_channels * 217
+        args.embed_dim = (args.hidden_channels / 4) * 217
         total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, epoch, pseudo_thr, args)
         train_data = update_train_data
         train_auc, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device)

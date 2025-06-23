@@ -228,10 +228,6 @@ def visualize_embeddings(model, dataloader, epoch, original_train_data, args):
             alpha=0.7, s=20, color=colors[i]
         )
 
-    # for i in range(num_classes):
-    #     idx = labels == i
-    #     plt.scatter(embeds_2d[idx, 0], embeds_2d[idx, 1], label=f'Class {i}', alpha=0.7, s=20)
-
     plt.legend()
     plt.title(f'Graph Embedding at Epoch {epoch}')
     plt.grid(True)
