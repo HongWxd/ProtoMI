@@ -217,6 +217,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 confs_list = confs[high_conf_mask]
                 if args.training_methods == 'Self_Training':
                     update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data) # balance the unlabeled samples
+
                 for update_data in update_list:
                     if len(labeled_train_data) >= pseudo_thr*2:
                         continue
@@ -366,7 +367,7 @@ def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     plt.plot(epochs, total_test_loss, marker='o', label='Test Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Loss Curve')
+    plt.title('Loss Curve') 
     plt.grid(True)
     plt.legend()
 
