@@ -101,7 +101,7 @@ def evaluate(model, loader, device):
 
     return auc_score, precision, recall, f1, total_samples, total_loss
 
-with open('./data/all_data.pkl', 'rb') as f:
+with open('./data/all_data_descriptors.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 best_fold = 0
@@ -119,6 +119,7 @@ kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
 for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     print(f'===== Fold {fold+1} =====')
     train_data = [all_data[i] for i in train_idx]
+    print(train_data[0])
     test_data = [all_data[i] for i in test_idx]
     training_data_analysis(fold+1, train_data, test_data)# print the label ratio during training
     pseudo_thr = len([i for i in train_data if i.mask == True])

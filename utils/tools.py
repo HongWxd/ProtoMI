@@ -112,7 +112,7 @@ def getMolDescriptors(mol, missingVal=None):
     ''' calculate the full list of descriptors for a molecule
         missingVal is used if the descriptor cannot be calculated
     '''
-    res = {}
+    res = []
     for nm,fn in Descriptors._descList:
         # some of the descriptor fucntions can throw errors if they fail, catch those here:
         try:
@@ -123,7 +123,7 @@ def getMolDescriptors(mol, missingVal=None):
             traceback.print_exc()
             # and set the descriptor value to whatever missingVal is
             val = missingVal
-        res[nm] = val
+        res.append(val)
     return res
 
 def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
@@ -178,6 +178,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
     n_edges = n_edges
     n_node_features = n_node_features
     n_edge_features = n_edge_features
+    descriptors = torch.tensor(descriptors, dtype=torch.float)
 
     return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors
 

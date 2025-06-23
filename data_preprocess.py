@@ -14,7 +14,7 @@ all_data_path = './data/all_data.pkl'
 
 # load the dataset
 dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=False)
-labeled_data = dataset.save_labeled_data()
+# labeled_data = dataset.save_labeled_data()
 # with open('./data/baseline_data.pkl', 'wb') as f:
 #     pickle.dump(dataset.data, f)
 with open('./data/all_data_descriptors.pkl', 'wb') as file:
