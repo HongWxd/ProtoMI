@@ -8,7 +8,7 @@ import pickle
 import numpy as np
 import torch.nn.functional as F
 import torch
-from torch.nn import Linear, Dropout, Sequential, ReLU
+from torch.nn import Linear, Dropout, Sequential, ReLU, LayerNorm, MultiheadAttention
 from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool, GINEConv
 from sklearn.model_selection import train_test_split
 import imageio.v2 as imageio
@@ -18,16 +18,19 @@ from sklearn.utils.class_weight import compute_class_weight
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
-parser.add_argument('--num_classes', type=int, default=3, help='Number of classes')
-parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
-parser.add_argument('--hidden_channels', type=int, default=64, help='Number of hidden channels')
+parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
+parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
+parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=5, help='fold number of cross validation')
-parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
+parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
+parser.add_argument('--patience', type=int, default=20, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.95, help='threshold of self training')
-parser.add_argument('--warm_up_epoch', type=int, default=30, help='self training warm up epoch period')
+parser.add_argument('--threshold', type=float, default=0.85, help='Threshold of self training')
+parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
+parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
+parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
+parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
@@ -81,6 +84,64 @@ class GCN_with_edge_attr(torch.nn.Module):
         x = self.lin(x)
         return x
 
+class GINE_descriptor(torch.nn.Module):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
+        super(GINE_descriptor, self).__init__()
+
+        nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
+        self.conv1 = GINEConv(nn1, edge_dim=num_edge_features)
+
+        nn2 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
+        self.conv2 = GINEConv(nn2, edge_dim=num_edge_features)
+
+        nn3 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
+        self.conv3 = GINEConv(nn3, edge_dim=num_edge_features)
+
+        self.multihead_attn = MultiheadAttention(args.hidden_channels, args.num_heads, batch_first=True)
+        self.desp_embed = Linear(args.desp_dim, args.hidden_channels * args.desp_dim)
+        self.desp_num = args.desp_dim
+        self.attn_norm = LayerNorm(args.hidden_channels)
+        
+        self.lin1 = Linear(hidden_channels, hidden_channels)
+        self.lin2 = Linear(hidden_channels, num_classes)
+        self.dropout = Dropout(dropout)
+
+    def forward(self, x, edge_index, edge_attr, batch, descriptors):
+        descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)# some descriptors are None
+
+        x = self.conv1(x, edge_index, edge_attr)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv2(x, edge_index, edge_attr)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv3(x, edge_index, edge_attr)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = global_mean_pool(x, batch)# [batchsize, hidden_channels]
+        B = x.shape[0]
+        H = x.shape[1]
+        N = self.desp_num
+        
+        desp_embed = self.desp_embed(descriptors) 
+        desp_embed = desp_embed.view(B, N, H) # [batchsize, num_desp_features] --> [batchsize, num_desp_features, hidden_channels]
+        x_in = x.unsqueeze(1)  # [B, 1, hidden_channels]
+
+        x, _ = self.multihead_attn(x_in, desp_embed, desp_embed)
+        x = x_in + self.attn_norm(x)
+        # desp_out, _ = self.multihead_attn(desp_embed, x_in, x_in) # [B, N, H]
+        x = x.squeeze(1)
+
+        x = self.lin1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+        x = self.lin2(x)
+        
+        return x
+
 def imbalanced_weights(train_data, device):
     y = []
     for data in train_data:
@@ -96,7 +157,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     with torch.no_grad():
         for i, data in enumerate(unlabeled_loader):
             data = data.to(device)
-            logits = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             probs = F.softmax(logits, dim=-1)
             confs, preds = probs.max(dim=1)
             high_conf_mask = confs > args.threshold
@@ -188,7 +249,7 @@ def visualize_embeddings(model, dataloader, epoch, original_train_data, args):
     with torch.no_grad():
         for data in dataloader:
             data = data.to(device)
-            embeds = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            embeds = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             all_embeds.append(embeds.cpu())
             all_labels.append(data.y.cpu())
 
@@ -263,7 +324,7 @@ def SSL_train(model, train_data, device, optimizer, criterion, epoch, pseudo_thr
     for i, data in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
 
         loss.backward()
@@ -295,7 +356,7 @@ def train(model, train_loader, device, optimizer, criterion):
 
 def make_gif(args, image_folder):
     if args.training_methods == 'Self_Training':
-        output_path='./figs/SSL_embedding_evolution.gif'
+        output_path='./figs/SSL_desp_embedding_evolution.gif'
         postfix = 'SSL.png'
     else:
         output_path='./figs/embedding_evolution.gif'
@@ -308,7 +369,7 @@ def make_gif(args, image_folder):
     imageio.mimsave(output_path, images, duration=0.4)
 
 # main
-with open('./data/all_data.pkl', 'rb') as f:
+with open('./data/all_data_descriptors.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 train_data, test_data = train_test_split(all_data, test_size=0.2, random_state=42, shuffle=True)
@@ -317,9 +378,9 @@ pseudo_thr = len([i for i in train_data if i.mask == True])
 train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
 test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-model = GCN_with_edge_attr(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
         hidden_channels=args.hidden_channels,
-        num_classes=args.num_classes, dropout=args.dropout).to(device)
+        num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
 criterion = torch.nn.CrossEntropyLoss()

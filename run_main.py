@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN, GINE
+from model import GCN, GINE, GINE_descriptor
 from tqdm import tqdm
 import time
 import pickle
@@ -25,7 +25,7 @@ parser.add_argument('--epoch', type=int, default=300, help='Number of training e
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
 parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
-parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
+parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
@@ -33,7 +33,7 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
 args = parser.parse_args()
-device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 def train(model, train_loader, device, optimizer, criterion, epoch, args):
     model.train()
@@ -48,8 +48,9 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
 
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
+        weights = 0
 
         if args.training_methods == 'Self_Training':
             loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
@@ -78,7 +79,7 @@ def evaluate(model, loader, device, criterion):
                 continue
 
             data = data.to(device)
-            out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             loss = criterion(out[data.mask], data.y[data.mask])
 
             pred = out.argmax(dim=1)
@@ -97,7 +98,7 @@ def evaluate(model, loader, device, criterion):
 
     return AUC, precision, recall, f1, total_samples, total_loss
 
-with open('./data/labeled_data.pkl', 'rb') as f:
+with open('./data/all_data_descriptors.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
 best_fold = 0
@@ -114,9 +115,9 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GCN(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout).to(device)
+            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
     print(model)
 
@@ -194,7 +195,7 @@ print(f'Best fold: {best_fold}')
 
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/plot_data/GCN_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/plot_data/GINE_descriptors_data.csv', index=False)
 
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
