@@ -7,6 +7,7 @@ from utils.tools import Graph_data_generator, get_statistical_values
 from sklearn.model_selection import train_test_split
 from rdkit import Chem
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 class MoleculeDataset(Dataset):
     def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=True, 
@@ -34,13 +35,13 @@ class MoleculeDataset(Dataset):
         cids = list(set(self.searching_space_df['cid'].values))
         cids = [int(i) for i in cids]
 
-        mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std = self.get_mean_std_values(cids)
+        mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std = self.get_mean_std_values(cids)
 
         data_list = []
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
             _, _, smile, _, _, _, _, label = self.read_from_one_call(cid)
-            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
+            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
 
@@ -95,21 +96,24 @@ class MoleculeDataset(Dataset):
         total_all_masses = []
         total_all_vdw = []
         total_all_covalent = []
+        total_descriptors = []
         for cid in tqdm(cids, desc='Get some statistical values of data'):
             _, _, smile, _, _, _, _,_ = self.read_from_one_call(cid)
-            all_masses, all_vdw, all_covalent = get_statistical_values(smile)
+            all_masses, all_vdw, all_covalent, descriptors = get_statistical_values(smile)
             if all_masses == None:
                 continue
 
             total_all_masses += all_masses
             total_all_vdw += all_vdw
             total_all_covalent += all_covalent
+            total_descriptors += descriptors
         
         mass_mean, mass_std = np.mean(total_all_masses), np.std(total_all_masses)
         vdw_mean, vdw_std, vdw_max = np.mean(total_all_vdw), np.std(total_all_vdw), max(total_all_vdw)
         covalent_mean, covalent_std = np.mean(total_all_covalent), np.std(total_all_covalent)
+        descriptors_mean, descriptors_std = np.mean(total_descriptors), np.std(total_descriptors)
 
-        return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std
+        return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std
     
     def save_labeled_data(self):
         labeled_data_list = []

@@ -24,7 +24,7 @@ parser.add_argument('--hidden_channels', type=int, default=256, help='Number of 
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
-parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
+parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
@@ -33,7 +33,7 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
 args = parser.parse_args()
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
 def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     labeled_train_data = [i for i in train_data if i.mask == True]
@@ -48,7 +48,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     for i, data in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors, args)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         criterion = torch.nn.CrossEntropyLoss(weight=weights)
         loss = criterion(out, data.y)# labeled loss
 
@@ -82,7 +82,7 @@ def evaluate(model, loader, device):
                 continue
 
             data = data.to(device)
-            out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors, args)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             criterion = torch.nn.CrossEntropyLoss()
             loss = criterion(out[data.mask], data.y[data.mask])
 

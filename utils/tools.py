@@ -126,7 +126,7 @@ def getMolDescriptors(mol, missingVal=None):
         res.append(val)
     return res
 
-def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
+def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
@@ -142,6 +142,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
 
     # get descriptors
     descriptors = getMolDescriptors(mol)
+    descriptors = (descriptors - descriptors_mean) / descriptors_std
     # soap_descriptor = get_SOAP_descriptor(mol, vdw_max)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
@@ -185,7 +186,7 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
 def get_statistical_values(x_smiles):
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
-        return None, None, None
+        return None, None, None, None
 
     all_masses = []
     all_vdw = []
@@ -194,8 +195,10 @@ def get_statistical_values(x_smiles):
         all_masses.append(float(atom.GetMass()))
         all_vdw.append(float(Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum())))
         all_covalent.append(float(Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum())))
+    
+    descriptors = getMolDescriptors(mol)
 
-    return all_masses, all_vdw, all_covalent
+    return all_masses, all_vdw, all_covalent, descriptors
 
 def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args):
     model.eval()
@@ -203,7 +206,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     with torch.no_grad():
         for i, data in enumerate(unlabeled_loader):
             data = data.to(device)
-            logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors, args)
+            logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             probs = F.softmax(logits, dim=-1)
             confs, preds = probs.max(dim=1)
             high_conf_mask = confs > args.threshold
@@ -363,12 +366,19 @@ def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
 
     plt.figure(figsize=(12, 5))
 
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_loss, marker='o', label='Train Loss')
-    plt.plot(epochs, total_test_loss, marker='o', label='Test Loss')
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs, train_loss, marker='o', label='Train Loss', color='tab:blue')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Loss Curve') 
+    plt.title('Train Loss Curve')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(2, 2, 3)
+    plt.plot(epochs, total_test_loss, marker='o', label='Test Loss', color='tab:orange')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Test Loss Curve')
     plt.grid(True)
     plt.legend()
 

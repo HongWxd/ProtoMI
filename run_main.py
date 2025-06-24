@@ -23,12 +23,14 @@ parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learnin
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=10, help='fold number of cross validation')
-parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
-parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.9, help='threshold of self training')
-parser.add_argument('--T1', type=int, default=1, help='self training warm up epoch period')
-parser.add_argument('--T2', type=int, default=150, help='epoch time period of self training')
+parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
+parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
+parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
+parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
+parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
+parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
+parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
+parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
 args = parser.parse_args()
 device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
@@ -48,7 +50,6 @@ def train(model, train_loader, device, optimizer, criterion, epoch, args):
         optimizer.zero_grad()
         out = model(data.x, data.edge_index, data.edge_attr, data.batch)
         loss = criterion(out[data.mask], data.y[data.mask])# labeled loss
-        # loss = facility_location_loss(out[data.mask], data.y[data.mask])
 
         if args.training_methods == 'Self_Training':
             loss, pseudo_loss, pseudo_samples = self_training(model, data, loss, out, epoch, criterion, device, args)
@@ -79,9 +80,6 @@ def evaluate(model, loader, device, criterion):
             data = data.to(device)
             out = model(data.x, data.edge_index, data.edge_attr, data.batch)
             loss = criterion(out[data.mask], data.y[data.mask])
-            # loss = facility_location_loss(out[data.mask], data.y[data.mask])
-            # probs = F.softmax(out, dim=-1)
-            # print(out)
 
             pred = out.argmax(dim=1)
             all_preds.append(pred[data.mask].cpu())
