@@ -26,7 +26,7 @@ class GCN(torch.nn.Module):
         return x
 
 class GINE(torch.nn.Module):
-    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
         super(GINE, self).__init__()
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
@@ -42,7 +42,7 @@ class GINE(torch.nn.Module):
         self.lin2 = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
-    def forward(self, x, edge_index, edge_attr, batch):
+    def forward(self, x, edge_index, edge_attr, batch, descriptors):
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
         x = self.dropout(x)

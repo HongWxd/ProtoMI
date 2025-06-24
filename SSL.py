@@ -127,7 +127,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    model = GINE(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
@@ -228,7 +228,7 @@ print(f'Best fold: {best_fold}')
 
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_descriptor_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_data.csv', index=False)
 
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')

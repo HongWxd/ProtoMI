@@ -32,7 +32,7 @@ model_all = (
     ["GCN"] * len(gcn_auc) + 
     ["GINE"] * len(gine_auc) + 
     ["GINE_SSL"] * len(gine_ssl_auc) + 
-    ["GINE_SSL_desp"] * len(gine_ssl_d_auc)
+    ["GINE_SSL_D"] * len(gine_ssl_d_auc)
 )
 
 df = pd.DataFrame({
