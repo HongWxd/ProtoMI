@@ -87,7 +87,7 @@ class GINE_descriptor(torch.nn.Module):
         self.dropout = Dropout(dropout)
 
     def forward(self, x, edge_index, edge_attr, batch, descriptors):
-        descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)
+        descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)# some descriptors are None
 
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
@@ -108,10 +108,11 @@ class GINE_descriptor(torch.nn.Module):
         
         desp_embed = self.desp_embed(descriptors) 
         desp_embed = desp_embed.view(B, N, H) # [batchsize, num_desp_features] --> [batchsize, num_desp_features, hidden_channels]
-        x = x.unsqueeze(1)  # [B, 1, hidden_channels]
+        x_in = x.unsqueeze(1)  # [B, 1, hidden_channels]
 
-        x, _ = self.multihead_attn(x, desp_embed, desp_embed)
-        x = x + self.attn_norm(x)
+        x, _ = self.multihead_attn(x_in, desp_embed, desp_embed)
+        x = x_in + self.attn_norm(x)
+        # desp_out, _ = self.multihead_attn(desp_embed, x_in, x_in) # [B, N, H]
         x = x.squeeze(1)
 
         x = self.lin1(x)
