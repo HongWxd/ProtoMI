@@ -222,10 +222,13 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
             confs, preds = probs.max(dim=1)
 
             if (pos_need > 0 and epoch > 50) or (neg_need > 0 and epoch > 50):
+                print('threshold', threshold)
                 threshold = 0.85
             elif (pos_need > 0 and epoch > 80) or (neg_need > 0 and epoch > 80):
+                print('threshold', threshold)
                 threshold = 0.80
             elif epoch <= 50:
+                print('threshold', threshold)
                 threshold = args.threshold
                 
             high_conf_mask = confs > threshold
@@ -290,7 +293,7 @@ def sample_balancer(update_list, confs_list, pos_need, neg_need):
             select_neg_data = [data for i, data in enumerate(neg_data) if neg_mask[i]]
             balanced_update_list += select_neg_data
 
-    return balanced_update_list, pos_need, neg_need
+    return balanced_update_list
 
 def training_data_analysis(fold, train_data, test_data):
     train_label_set = [i for i in train_data if i.mask == True]

@@ -21,7 +21,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='Batch size for t
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
-parser.add_argument('--epoch', type=int, default=350, help='Number of training epochs')
+parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
 parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cross validation')
