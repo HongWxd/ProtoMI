@@ -288,20 +288,20 @@ def sample_balancer(update_list, confs_list, pos_need, neg_need):
 def threshold_adaptor(epoch, labeled_train_data, args):
     pos_sample = 0
     neg_sample = 0
+    threshold = args.threshold
     for data in labeled_train_data:
         if data.y == 0:
             neg_sample += 1
         elif data.y == 1:
             pos_sample += 1
 
-    if epoch <= args.warm_up_epoch:
-        threshold = args.threshold
-    elif epoch > args.warm_up_epoch + 10 and pos_sample != neg_sample:
+    if epoch > args.warm_up_epoch + 20 and pos_sample != neg_sample:
         threshold = args.threshold - 0.05
-    elif epoch > args.warm_up_epoch + 20 and pos_sample != neg_sample:
-        threshold = args.threshold - 0.1
     elif epoch > args.warm_up_epoch + 30 and pos_sample != neg_sample:
+        threshold = args.threshold - 0.1
+    elif epoch > args.warm_up_epoch + 40 and pos_sample != neg_sample:
         threshold = args.threshold - 0.15
+    print(f'[Epoch {epoch}]', 'CC:', threshold)
     
     return threshold
 
