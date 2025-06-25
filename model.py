@@ -4,14 +4,14 @@ from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention, Laye
 from torch_geometric.nn import GCNConv, GINEConv, global_mean_pool
 
 class GCN(torch.nn.Module):
-    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
         super(GCN, self).__init__()
         self.conv1 = GCNConv(num_node_features, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.lin = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
-    def forward(self, x, edge_index, edge_attr, batch):
+    def forward(self, x, edge_index, edge_attr, batch, descriptors):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.dropout(x)
