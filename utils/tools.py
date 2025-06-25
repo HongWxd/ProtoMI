@@ -201,17 +201,7 @@ def get_statistical_values(x_smiles):
     return all_masses, all_vdw, all_covalent, descriptors
 
 def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args):
-    pos_sample = 0
-    neg_sample = 0
-    for data in labeled_train_data:
-        if data.y == 0:
-            neg_sample += 1
-        elif data.y == 1:
-            pos_sample += 1
-
-    pos_need = pseudo_thr - pos_sample
-    neg_need = pseudo_thr - neg_sample
-
+    threshold = threshold_adaptor(epoch, labeled_train_data, args)    
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
@@ -220,17 +210,6 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
             logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             probs = F.softmax(logits, dim=-1)
             confs, preds = probs.max(dim=1)
-
-            if (pos_need > 0 and epoch > 50) or (neg_need > 0 and epoch > 50):
-                print('threshold', threshold)
-                threshold = 0.85
-            elif (pos_need > 0 and epoch > 80) or (neg_need > 0 and epoch > 80):
-                print('threshold', threshold)
-                threshold = 0.80
-            elif epoch <= 50:
-                print('threshold', threshold)
-                threshold = args.threshold
-                
             high_conf_mask = confs > threshold
 
             if high_conf_mask.sum() > 0:
@@ -242,6 +221,16 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
                 if args.training_methods == 'Self_Training':
+                    pos_sample = 0
+                    neg_sample = 0
+                    for data in labeled_train_data:
+                        if data.y == 0:
+                            neg_sample += 1
+                        elif data.y == 1:
+                            pos_sample += 1
+
+                    pos_need = pseudo_thr - pos_sample
+                    neg_need = pseudo_thr - neg_sample
                     update_list = sample_balancer(update_list, confs_list, pos_need, neg_need) # balance the unlabeled samples
 
                 for update_data in update_list:
@@ -276,7 +265,8 @@ def sample_balancer(update_list, confs_list, pos_need, neg_need):
     if pos_need >= len(pos_data):
         balanced_update_list += pos_data
     else:
-        if pos_need != 0:
+        if pos_need > 0 and pos_need < len(pos_conf):
+            print(pos_need, len(pos_conf))
             _, pos_topk_indices = torch.topk(torch.tensor(pos_conf), pos_need, largest=True)
             pos_mask = torch.zeros_like(torch.tensor(pos_conf), dtype=torch.bool)
             pos_mask[pos_topk_indices] = True
@@ -286,7 +276,7 @@ def sample_balancer(update_list, confs_list, pos_need, neg_need):
     if neg_need >= len(neg_data):
         balanced_update_list += neg_data
     else:
-        if neg_need != 0:
+        if neg_need > 0 and neg_need < len(neg_conf):
             _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
             neg_mask = torch.zeros_like(torch.tensor(neg_conf), dtype=torch.bool)
             neg_mask[neg_topk_indices] = True
@@ -294,6 +284,26 @@ def sample_balancer(update_list, confs_list, pos_need, neg_need):
             balanced_update_list += select_neg_data
 
     return balanced_update_list
+
+def threshold_adaptor(epoch, labeled_train_data, args):
+    pos_sample = 0
+    neg_sample = 0
+    for data in labeled_train_data:
+        if data.y == 0:
+            neg_sample += 1
+        elif data.y == 1:
+            pos_sample += 1
+
+    if epoch <= args.warm_up_epoch:
+        threshold = args.threshold
+    elif epoch > args.warm_up_epoch + 10 and pos_sample != neg_sample:
+        threshold = args.threshold - 0.05
+    elif epoch > args.warm_up_epoch + 20 and pos_sample != neg_sample:
+        threshold = args.threshold - 0.1
+    elif epoch > args.warm_up_epoch + 30 and pos_sample != neg_sample:
+        threshold = args.threshold - 0.15
+    
+    return threshold
 
 def training_data_analysis(fold, train_data, test_data):
     train_label_set = [i for i in train_data if i.mask == True]

@@ -7,7 +7,6 @@ from utils.tools import Graph_data_generator, get_statistical_values
 from sklearn.model_selection import train_test_split
 from rdkit import Chem
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 
 class MoleculeDataset(Dataset):
     def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=True, 

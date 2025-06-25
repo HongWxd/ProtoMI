@@ -10,7 +10,6 @@ from utils.tools import plot_train_results, self_training, training_data_analysi
 from sklearn.model_selection import KFold, RepeatedKFold
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
-import torch.nn.functional as F
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -64,12 +63,25 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
         if epoch >= args.warm_up_epoch:# Warm up for several epoches
             if total_masked <= pseudo_thr*2:# Control the pseudo samples 
                 labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args)
-                    
+    
+    pos_sample = 0
+    neg_sample = 0
+    early_stop_flag = 0
+    for data in labeled_train_data:
+        if data.y == 0:
+            neg_sample += 1
+        elif data.y == 1:
+            pos_sample += 1
+    if pos_sample != neg_sample:
+        early_stop_flag = 0
+    else:
+        early_stop_flag = 1
+
     labeled_train_cid_list = [i.cid for i in labeled_train_data]
     unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]
     train_data = labeled_train_data + unlabeled_train_data
 
-    return total_loss, total_samples, train_loader, train_data
+    return total_loss, total_samples, train_loader, train_data, early_stop_flag
 
 def evaluate(model, loader, device):
     model.eval()
@@ -164,7 +176,7 @@ for fold, (train_idx, test_idx) in enumerate(rskf.split(all_data)):
             label_1_list_init.append(label_1)
         
         start_time = time.time()
-        total_train_loss, train_samples, train_loader, update_train_data = train(model, train_data, device, optimizer, epoch, pseudo_thr, args)
+        total_train_loss, train_samples, train_loader, update_train_data, early_stop_flag = train(model, train_data, device, optimizer, epoch, pseudo_thr, args)
         train_data = update_train_data
         train_auc, train_precision, train_recall, train_f1, _, _ = evaluate(model, train_loader, device)
         test_auc, test_precision, test_recall, test_f1, test_samples, test_loss = evaluate(model, test_loader, device)
@@ -182,7 +194,7 @@ for fold, (train_idx, test_idx) in enumerate(rskf.split(all_data)):
                 best_model_state_dict = model.state_dict()
                 best_fold = fold + 1
         else:
-            if epoch > args.warm_up_epoch:
+            if epoch > args.warm_up_epoch and early_stop_flag == 1:
                 early_stop_counter += 1
                 print(f"Early stop counter: {early_stop_counter} / {args.patience}")
                 if early_stop_counter >= args.patience:

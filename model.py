@@ -107,7 +107,7 @@ class GINE_descriptor(torch.nn.Module):
         N = self.desp_num
         
         desp_embed = self.desp_embed(descriptors) 
-        desp_embed = desp_embed.view(B, N, H) # [batchsize, num_desp_features] --> [batchsize, num_desp_features, hidden_channels]
+        desp_embed = desp_embed.view(B, N, H) # [batchsize, num_desp_features * hidden_channels] --> [batchsize, num_desp_features, hidden_channels]
         x_in = x.unsqueeze(1)  # [B, 1, hidden_channels]
 
         x, _ = self.multihead_attn(x_in, desp_embed, desp_embed)
