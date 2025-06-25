@@ -7,7 +7,7 @@ from tqdm import tqdm
 import time
 import pickle
 from utils.tools import plot_train_results, self_training, training_data_analysis, imbalanced_weights
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, RepeatedKFold
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 import torch.nn.functional as F
@@ -24,7 +24,8 @@ parser.add_argument('--hidden_channels', type=int, default=256, help='Number of 
 parser.add_argument('--epoch', type=int, default=350, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
-parser.add_argument('--patience', type=int, default=20, help='Patience for early stopping')
+parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cross validation')
+parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.85, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
@@ -117,7 +118,8 @@ label_0_list_last = []
 label_1_list_last = []
 best_model_state_dict = None
 kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
-for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
+rskf = RepeatedKFold(n_splits=args.folds, n_repeats=args.repeats, random_state=42)
+for fold, (train_idx, test_idx) in enumerate(rskf.split(all_data)):
     print(f'===== Fold {fold+1} =====')
     train_data = [all_data[i] for i in train_idx]
     test_data = [all_data[i] for i in test_idx]
@@ -127,7 +129,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GINE(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+    model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
             hidden_channels=args.hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
@@ -228,7 +230,7 @@ print(f'Best fold: {best_fold}')
 
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_descriptor_data.csv', index=False)
 
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
