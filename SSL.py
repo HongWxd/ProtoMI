@@ -24,7 +24,7 @@ parser.add_argument('--epoch', type=int, default=300, help='Number of training e
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
 parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cross validation')
-parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
+parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
@@ -131,7 +131,7 @@ label_1_list_last = []
 best_model_state_dict = None
 kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
 rskf = RepeatedKFold(n_splits=args.folds, n_repeats=args.repeats, random_state=42)
-for fold, (train_idx, test_idx) in enumerate(rskf.split(all_data)):
+for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     print(f'===== Fold {fold+1} =====')
     train_data = [all_data[i] for i in train_idx]
     test_data = [all_data[i] for i in test_idx]

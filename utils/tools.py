@@ -201,7 +201,7 @@ def get_statistical_values(x_smiles):
     return all_masses, all_vdw, all_covalent, descriptors
 
 def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args):
-    threshold = threshold_adaptor(epoch, labeled_train_data, args)    
+    threshold = args.threshold   
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
