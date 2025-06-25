@@ -27,7 +27,7 @@ parser.add_argument('--folds', type=int, default=10, help='Fold number of cross 
 parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cross validation')
 parser.add_argument('--patience', type=int, default=10, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
-parser.add_argument('--threshold', type=float, default=0.85, help='Threshold of self training')
+parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
@@ -63,7 +63,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     if args.training_methods == 'Self_Training':
         if epoch >= args.warm_up_epoch:# Warm up for several epoches
             if total_masked <= pseudo_thr*2:# Control the pseudo samples 
-                labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args)
+                labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args)
                     
     labeled_train_cid_list = [i.cid for i in labeled_train_data]
     unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]

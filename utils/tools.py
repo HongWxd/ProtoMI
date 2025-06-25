@@ -200,7 +200,18 @@ def get_statistical_values(x_smiles):
 
     return all_masses, all_vdw, all_covalent, descriptors
 
-def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, weights, args):
+def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args):
+    pos_sample = 0
+    neg_sample = 0
+    for data in labeled_train_data:
+        if data.y == 0:
+            neg_sample += 1
+        elif data.y == 1:
+            pos_sample += 1
+
+    pos_need = pseudo_thr - pos_sample
+    neg_need = pseudo_thr - neg_sample
+
     model.eval()
     unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
     with torch.no_grad():
@@ -209,7 +220,15 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
             logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
             probs = F.softmax(logits, dim=-1)
             confs, preds = probs.max(dim=1)
-            high_conf_mask = confs > args.threshold
+
+            if (pos_need > 0 and epoch > 50) or (neg_need > 0 and epoch > 50):
+                threshold = 0.85
+            elif (pos_need > 0 and epoch > 80) or (neg_need > 0 and epoch > 80):
+                threshold = 0.80
+            elif epoch <= 50:
+                threshold = args.threshold
+                
+            high_conf_mask = confs > threshold
 
             if high_conf_mask.sum() > 0:
                 data.y = data.y.clone()
@@ -220,7 +239,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
                 if args.training_methods == 'Self_Training':
-                    update_list = sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data) # balance the unlabeled samples
+                    update_list = sample_balancer(update_list, confs_list, pos_need, neg_need) # balance the unlabeled samples
 
                 for update_data in update_list:
                     if len(labeled_train_data) >= pseudo_thr*2:
@@ -237,15 +256,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
     
     return labeled_train_data
 
-def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
-    pos_sample = 0
-    neg_sample = 0
-    for data in labeled_train_data:
-        if data.y == 0:
-            neg_sample += 1
-        elif data.y == 1:
-            pos_sample += 1
-
+def sample_balancer(update_list, confs_list, pos_need, neg_need):
     balanced_update_list = []
     pos_data = []
     neg_data = []
@@ -258,9 +269,6 @@ def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
         elif data.y.item() == 0:
             neg_data.append(data)
             neg_conf.append(confs)
-    
-    pos_need = pseudo_thr - pos_sample
-    neg_need = pseudo_thr - neg_sample
 
     if pos_need >= len(pos_data):
         balanced_update_list += pos_data
@@ -282,7 +290,7 @@ def sample_balancer(update_list, pseudo_thr, confs_list, labeled_train_data):
             select_neg_data = [data for i, data in enumerate(neg_data) if neg_mask[i]]
             balanced_update_list += select_neg_data
 
-    return balanced_update_list
+    return balanced_update_list, pos_need, neg_need
 
 def training_data_analysis(fold, train_data, test_data):
     train_label_set = [i for i in train_data if i.mask == True]
