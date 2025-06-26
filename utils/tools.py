@@ -138,11 +138,6 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     n_node_features = len(get_atom_features(unrelated_mol.GetAtomWithIdx(0), mass_mean, mass_std, vdw_mean, vdw_std, covalent_mean, covalent_std))
     n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
 
-    # get descriptors
-    # descriptors = getMolDescriptors(mol)
-    # descriptors = (descriptors - descriptors_mean) / descriptors_std
-    # Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor = get_reproted_descriptor(formula, mol)
-
     # construct node feature matrix X of shape (n_nodes, n_node_features)
     X = np.zeros((n_nodes, n_node_features))
 
@@ -177,10 +172,6 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     n_edges = n_edges
     n_node_features = n_node_features
     n_edge_features = n_edge_features
-    # Normal_descriptors = torch.tensor(Normal_descriptors, dtype=torch.float)
-    # MD_descriptor = torch.tensor(MD_descriptor, dtype=torch.float)
-    # VO_descriptor = torch.tensor(VO_descriptor, dtype=torch.float)
-    # YSS_descriptor = torch.tensor(YSS_descriptor, dtype=torch.float)
 
     return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
 
