@@ -13,6 +13,9 @@ from dscribe.descriptors import SOAP
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import Data
 from sklearn.utils.class_weight import compute_class_weight
+import matminer.featurizers.composition as mm_composition
+import matminer.featurizers.structure as mm_structure
+from pymatgen.core import Composition
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -104,9 +107,29 @@ def get_SOAP_descriptor(mol, vdw_max):
         l_max=6,
     )
     soap_descriptor = soap.create(ase_mol)
-    # print("SOAP shape:", soap_descriptor.shape)
+    print("SOAP shape:", soap_descriptor.shape)
 
     return soap_descriptor
+
+def get_reproted_descriptor(formula, mol, vdw_max):
+    comp = Composition(formula)
+    md_featurizer = mm_composition.Meredig()
+    MD_descriptor = md_featurizer.featurize(comp)
+
+    os_featurizer = mm_composition.OxidationStates()
+    OS_descriptor = os_featurizer.featurize(comp)
+
+    sc_featurizer = mm_structure.StructuralComplexity()
+
+    vo_featurizer = mm_composition.ValenceOrbital()
+    VO_descriptor = vo_featurizer.featurize(comp)
+
+    yss_featurizer = mm_composition.YangSolidSolution()
+    YSS_descriptor = yss_featurizer.featurize(comp)
+
+    SOAP_descriptor = get_SOAP_descriptor(mol, vdw_max)
+
+    return MD_descriptor, OS_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor
 
 def getMolDescriptors(mol, missingVal=None):
     ''' calculate the full list of descriptors for a molecule
@@ -126,7 +149,7 @@ def getMolDescriptors(mol, missingVal=None):
         res.append(val)
     return res
 
-def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std):
+def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
@@ -141,9 +164,9 @@ def Graph_data_generator(x_smiles, y, mass_mean, mass_std, vdw_mean, vdw_std, vd
     n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
 
     # get descriptors
-    descriptors = getMolDescriptors(mol)
-    descriptors = (descriptors - descriptors_mean) / descriptors_std
-    # soap_descriptor = get_SOAP_descriptor(mol, vdw_max)
+    # descriptors = getMolDescriptors(mol)
+    # descriptors = (descriptors - descriptors_mean) / descriptors_std
+    reported_descriptor = get_reproted_descriptor(formula)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
     X = np.zeros((n_nodes, n_node_features))
@@ -196,7 +219,8 @@ def get_statistical_values(x_smiles):
         all_vdw.append(float(Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum())))
         all_covalent.append(float(Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum())))
     
-    descriptors = getMolDescriptors(mol)
+    # descriptors = getMolDescriptors(mol)
+    descriptors = None
 
     return all_masses, all_vdw, all_covalent, descriptors
 
@@ -284,26 +308,6 @@ def sample_balancer(update_list, confs_list, pos_need, neg_need):
             balanced_update_list += select_neg_data
 
     return balanced_update_list
-
-def threshold_adaptor(epoch, labeled_train_data, args):
-    pos_sample = 0
-    neg_sample = 0
-    threshold = args.threshold
-    for data in labeled_train_data:
-        if data.y == 0:
-            neg_sample += 1
-        elif data.y == 1:
-            pos_sample += 1
-
-    if epoch > args.warm_up_epoch + 20 and pos_sample != neg_sample:
-        threshold = args.threshold - 0.05
-    elif epoch > args.warm_up_epoch + 30 and pos_sample != neg_sample:
-        threshold = args.threshold - 0.1
-    elif epoch > args.warm_up_epoch + 40 and pos_sample != neg_sample:
-        threshold = args.threshold - 0.15
-    print(f'[Epoch {epoch}]', 'CC:', threshold)
-    
-    return threshold
 
 def training_data_analysis(fold, train_data, test_data):
     train_label_set = [i for i in train_data if i.mask == True]

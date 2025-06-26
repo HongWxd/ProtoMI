@@ -39,8 +39,8 @@ class MoleculeDataset(Dataset):
         data_list = []
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
-            _, _, smile, _, _, _, _, label = self.read_from_one_call(cid)
-            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std) # edge_attr: (n_edges, n_edge_features)
+            _, formula, smile, _, _, _, _, label = self.read_from_one_call(cid)
+            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
 
