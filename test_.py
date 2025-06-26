@@ -48,8 +48,8 @@ def get_reproted_descriptor(formula, mol, vdw_max):
     md_featurizer = mm_composition.Meredig()
     MD_descriptor = md_featurizer.featurize(comp)
 
-    os_featurizer = mm_composition.OxidationStates()
-    OS_descriptor = os_featurizer.featurize(comp)
+    # os_featurizer = mm_composition.OxidationStates()
+    # OS_descriptor = os_featurizer.featurize(comp)
 
     sc_featurizer = mm_structure.StructuralComplexity()
 

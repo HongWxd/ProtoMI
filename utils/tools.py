@@ -116,8 +116,8 @@ def get_reproted_descriptor(formula, mol, vdw_max):
     md_featurizer = mm_composition.Meredig()
     MD_descriptor = md_featurizer.featurize(comp)
 
-    os_featurizer = mm_composition.OxidationStates()
-    OS_descriptor = os_featurizer.featurize(comp)
+    # os_featurizer = mm_composition.OxidationStates()
+    # OS_descriptor = os_featurizer.featurize(comp)
 
     sc_featurizer = mm_structure.StructuralComplexity()
 
@@ -129,7 +129,7 @@ def get_reproted_descriptor(formula, mol, vdw_max):
 
     SOAP_descriptor = get_SOAP_descriptor(mol, vdw_max)
 
-    return MD_descriptor, OS_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor
+    return MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor
 
 def getMolDescriptors(mol, missingVal=None):
     ''' calculate the full list of descriptors for a molecule
@@ -149,7 +149,7 @@ def getMolDescriptors(mol, missingVal=None):
         res.append(val)
     return res
 
-def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std):
+def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
@@ -166,7 +166,7 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     # get descriptors
     # descriptors = getMolDescriptors(mol)
     # descriptors = (descriptors - descriptors_mean) / descriptors_std
-    reported_descriptor = get_reproted_descriptor(formula)
+    MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor = get_reproted_descriptor(formula)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
     X = np.zeros((n_nodes, n_node_features))
@@ -220,9 +220,8 @@ def get_statistical_values(x_smiles):
         all_covalent.append(float(Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum())))
     
     # descriptors = getMolDescriptors(mol)
-    descriptors = None
 
-    return all_masses, all_vdw, all_covalent, descriptors
+    return all_masses, all_vdw, all_covalent
 
 def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args):
     threshold = args.threshold   

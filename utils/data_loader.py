@@ -34,23 +34,28 @@ class MoleculeDataset(Dataset):
         cids = list(set(self.searching_space_df['cid'].values))
         cids = [int(i) for i in cids]
 
-        mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std = self.get_mean_std_values(cids)
+        # for normalization purpose
+        mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std = self.get_mean_std_values(cids)
 
         data_list = []
+        descriptors_list = []
         for cid in tqdm(cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
             _, formula, smile, _, _, _, _, label = self.read_from_one_call(cid)
-            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std) # edge_attr: (n_edges, n_edge_features)
+            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
 
             # get the mask for semi-supervised learning
             if cid in labeled_cid_list:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, descriptors = descriptors.unsqueeze(0))
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             else:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, descriptors = descriptors.unsqueeze(0))
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             
             data_list.append(graph_data)
+            descriptors_list.append(descriptors)
+        
+
 
         return data_list        
     
@@ -98,21 +103,20 @@ class MoleculeDataset(Dataset):
         total_descriptors = []
         for cid in tqdm(cids, desc='Get some statistical values of data'):
             _, _, smile, _, _, _, _,_ = self.read_from_one_call(cid)
-            all_masses, all_vdw, all_covalent, descriptors = get_statistical_values(smile)
+            all_masses, all_vdw, all_covalent = get_statistical_values(smile)
             if all_masses == None:
                 continue
 
             total_all_masses += all_masses
             total_all_vdw += all_vdw
             total_all_covalent += all_covalent
-            total_descriptors += descriptors
         
         mass_mean, mass_std = np.mean(total_all_masses), np.std(total_all_masses)
         vdw_mean, vdw_std, vdw_max = np.mean(total_all_vdw), np.std(total_all_vdw), max(total_all_vdw)
         covalent_mean, covalent_std = np.mean(total_all_covalent), np.std(total_all_covalent)
-        descriptors_mean, descriptors_std = np.mean(total_descriptors), np.std(total_descriptors)
+        # descriptors_mean, descriptors_std = np.mean(total_descriptors), np.std(total_descriptors)
 
-        return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, descriptors_mean, descriptors_std
+        return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std
     
     def save_labeled_data(self):
         labeled_data_list = []
