@@ -63,8 +63,8 @@ def get_reproted_descriptor(formula, mol, vdw_max):
 
     return MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor
 
-comp = Composition('C9H13BO3')
-mol = Chem.MolFromSmiles('B(O)(O)OC1=CC=CC(=C1)C(C)C')
+comp = Composition('C7H9BO2S')
+mol = Chem.MolFromSmiles('B(CSC1=CC=CC=C1)(O)O')
 vdw_max = 8.0
 MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor = get_reproted_descriptor(comp, mol, vdw_max)
-print(len(MD_descriptor), len(VO_descriptor), len(YSS_descriptor), SOAP_descriptor.shape)
+print(len(MD_descriptor), len(VO_descriptor), (YSS_descriptor), SOAP_descriptor.shape)

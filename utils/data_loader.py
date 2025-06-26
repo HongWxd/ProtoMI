@@ -3,10 +3,12 @@ import pandas as pd
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
-from utils.tools import Graph_data_generator, get_statistical_values
+from utils.tools import Graph_data_generator, get_statistical_values, get_reproted_descriptor
 from sklearn.model_selection import train_test_split
 from rdkit import Chem
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from pymatgen.core import Composition
 
 class MoleculeDataset(Dataset):
     def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, cross_validate=True, 
@@ -35,30 +37,36 @@ class MoleculeDataset(Dataset):
         cids = [int(i) for i in cids]
 
         # for normalization purpose
-        mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std = self.get_mean_std_values(cids)
+        mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, norm_MD, norm_VO, norm_YSS, norm_normal = self.get_mean_std_values_and_descriptors(cids)
 
         data_list = []
-        descriptors_list = []
-        for cid in tqdm(cids, desc='Converting smiles data to graph data'):
+        for cid, md, vo, yss, normal in zip(tqdm(cids, desc='Converting smiles data to graph data'), norm_MD, norm_VO, norm_YSS, norm_normal):
             # get the graph data for each compound
             _, formula, smile, _, _, _, _, label = self.read_from_one_call(cid)
-            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
+            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
+            
+            try:
+                comp = Composition(formula)
+            except:
+                continue
+
+            md = torch.tensor(md, dtype=torch.float)
+            vo = torch.tensor(vo, dtype=torch.float)
+            yss = torch.tensor(yss, dtype=torch.float)
+            normal = torch.tensor(normal, dtype=torch.float)
 
             # get the mask for semi-supervised learning
             if cid in labeled_cid_list:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, md=md.unsqueeze(0), vo=vo.unsqueeze(0), yss=yss.unsqueeze(0), normal=normal.unsqueeze(0))
             else:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
+                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features, md=md.unsqueeze(0), vo=vo.unsqueeze(0), yss=yss.unsqueeze(0), normal=normal.unsqueeze(0))
             
             data_list.append(graph_data)
-            descriptors_list.append(descriptors)
-        
-
 
         return data_list        
-    
+
     def read_from_one_call(self, idx):
         formula = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'formula'].values[0])
         smile = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'SMILES'].values[0])
@@ -96,27 +104,51 @@ class MoleculeDataset(Dataset):
         print('avg degree:', 2 * edges / nodes)
         print('label rate:', len(self.save_labeled_data()) / self.__len__())
     
-    def get_mean_std_values(self, cids):
+    def get_mean_std_values_and_descriptors(self, cids):
         total_all_masses = []
         total_all_vdw = []
         total_all_covalent = []
         total_descriptors = []
+        total_MD = []
+        total_VO = []
+        total_YSS = []
         for cid in tqdm(cids, desc='Get some statistical values of data'):
-            _, _, smile, _, _, _, _,_ = self.read_from_one_call(cid)
-            all_masses, all_vdw, all_covalent = get_statistical_values(smile)
+            _, formula, smile, _, _, _, _,_ = self.read_from_one_call(cid)
+            mol, all_masses, all_vdw, all_covalent = get_statistical_values(smile)
             if all_masses == None:
+                continue
+
+            Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor = get_reproted_descriptor(formula, mol)
+            if Normal_descriptors == None:
                 continue
 
             total_all_masses += all_masses
             total_all_vdw += all_vdw
             total_all_covalent += all_covalent
+            total_descriptors += Normal_descriptors
+            total_MD += MD_descriptor
+            total_VO += VO_descriptor
+            total_YSS += YSS_descriptor
         
         mass_mean, mass_std = np.mean(total_all_masses), np.std(total_all_masses)
         vdw_mean, vdw_std, vdw_max = np.mean(total_all_vdw), np.std(total_all_vdw), max(total_all_vdw)
         covalent_mean, covalent_std = np.mean(total_all_covalent), np.std(total_all_covalent)
-        # descriptors_mean, descriptors_std = np.mean(total_descriptors), np.std(total_descriptors)
+        
+        total_descriptors = np.array(total_descriptors)
+        total_MD = np.array(total_MD)
+        total_VO = np.array(total_VO)
+        total_YSS = np.array(total_YSS)
+        scaler_MD = MinMaxScaler()
+        scaler_VO = MinMaxScaler()
+        scaler_YSS = MinMaxScaler()
+        scaler_normal = MinMaxScaler()
 
-        return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std
+        norm_MD = scaler_MD.fit_transform(total_MD).tolist()
+        norm_VO = scaler_VO.fit_transform(total_VO).tolist()
+        norm_YSS = scaler_YSS.fit_transform(total_YSS).tolist()
+        norm_normal = scaler_normal.fit_transform(total_descriptors).tolist()
+
+        return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, norm_MD, norm_VO, norm_YSS, norm_normal
     
     def save_labeled_data(self):
         labeled_data_list = []

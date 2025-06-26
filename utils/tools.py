@@ -83,43 +83,18 @@ def get_bond_features(bond,
 
     return np.array(bond_feature_vector)
 
-def get_SOAP_descriptor(mol, vdw_max):
-    SOAP_mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(SOAP_mol)
-    AllChem.UFFOptimizeMolecule(SOAP_mol)
-    conf = SOAP_mol.GetConformer()
-    positions = []
-    symbols = []
-    for atom in SOAP_mol.GetAtoms():
-        pos = conf.GetAtomPosition(atom.GetIdx())
-        positions.append([pos.x, pos.y, pos.z])
-        symbols.append(atom.GetSymbol())
-    positions = np.array(positions)
-
-    ase_mol = Atoms(symbols=symbols, positions=positions)
-
-    species = list(set(symbols))
-    soap = SOAP(
-        species=species,
-        periodic=False,
-        r_cut=2*vdw_max,
-        n_max=8,
-        l_max=6,
-    )
-    soap_descriptor = soap.create(ase_mol)
-    print("SOAP shape:", soap_descriptor.shape)
-
-    return soap_descriptor
-
-def get_reproted_descriptor(formula, mol, vdw_max):
-    comp = Composition(formula)
+def get_reproted_descriptor(formula, mol):
+    try:
+        comp = Composition(formula)
+    except:
+        return None, None, None, None
     md_featurizer = mm_composition.Meredig()
     MD_descriptor = md_featurizer.featurize(comp)
 
     # os_featurizer = mm_composition.OxidationStates()
     # OS_descriptor = os_featurizer.featurize(comp)
 
-    sc_featurizer = mm_structure.StructuralComplexity()
+    # sc_featurizer = mm_structure.StructuralComplexity()
 
     vo_featurizer = mm_composition.ValenceOrbital()
     VO_descriptor = vo_featurizer.featurize(comp)
@@ -127,9 +102,9 @@ def get_reproted_descriptor(formula, mol, vdw_max):
     yss_featurizer = mm_composition.YangSolidSolution()
     YSS_descriptor = yss_featurizer.featurize(comp)
 
-    SOAP_descriptor = get_SOAP_descriptor(mol, vdw_max)
+    Normal_descriptors = getMolDescriptors(mol)
 
-    return MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor
+    return Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor
 
 def getMolDescriptors(mol, missingVal=None):
     ''' calculate the full list of descriptors for a molecule
@@ -166,7 +141,7 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     # get descriptors
     # descriptors = getMolDescriptors(mol)
     # descriptors = (descriptors - descriptors_mean) / descriptors_std
-    MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor = get_reproted_descriptor(formula)
+    # Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor = get_reproted_descriptor(formula, mol)
 
     # construct node feature matrix X of shape (n_nodes, n_node_features)
     X = np.zeros((n_nodes, n_node_features))
@@ -202,9 +177,12 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     n_edges = n_edges
     n_node_features = n_node_features
     n_edge_features = n_edge_features
-    descriptors = torch.tensor(descriptors, dtype=torch.float)
+    # Normal_descriptors = torch.tensor(Normal_descriptors, dtype=torch.float)
+    # MD_descriptor = torch.tensor(MD_descriptor, dtype=torch.float)
+    # VO_descriptor = torch.tensor(VO_descriptor, dtype=torch.float)
+    # YSS_descriptor = torch.tensor(YSS_descriptor, dtype=torch.float)
 
-    return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features, descriptors
+    return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
 
 def get_statistical_values(x_smiles):
     mol = Chem.MolFromSmiles(x_smiles)
@@ -221,7 +199,7 @@ def get_statistical_values(x_smiles):
     
     # descriptors = getMolDescriptors(mol)
 
-    return all_masses, all_vdw, all_covalent
+    return mol, all_masses, all_vdw, all_covalent
 
 def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args):
     threshold = args.threshold   
