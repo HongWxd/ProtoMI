@@ -128,7 +128,7 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
-        return None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None
 
     # get feature dimensions
     n_nodes = mol.GetNumAtoms()
@@ -187,8 +187,6 @@ def get_statistical_values(x_smiles):
         all_masses.append(float(atom.GetMass()))
         all_vdw.append(float(Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum())))
         all_covalent.append(float(Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum())))
-    
-    # descriptors = getMolDescriptors(mol)
 
     return mol, all_masses, all_vdw, all_covalent
 
