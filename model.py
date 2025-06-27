@@ -105,6 +105,7 @@ class GINE_descriptor(torch.nn.Module):
 
     def forward(self, x, edge_index, edge_attr, batch, descriptors):
         descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)# some descriptors are None
+        print(descriptors)
 
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
