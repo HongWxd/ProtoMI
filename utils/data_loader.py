@@ -46,7 +46,7 @@ class MoleculeDataset(Dataset):
             x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
-            
+
             try:
                 comp = Composition(formula)
             except:
@@ -134,19 +134,19 @@ class MoleculeDataset(Dataset):
         vdw_mean, vdw_std, vdw_max = np.mean(total_all_vdw), np.std(total_all_vdw), max(total_all_vdw)
         covalent_mean, covalent_std = np.mean(total_all_covalent), np.std(total_all_covalent)
         
-        total_descriptors = np.array(total_descriptors)
-        total_MD = np.array(total_MD)
-        total_VO = np.array(total_VO)
-        total_YSS = np.array(total_YSS)
+        total_descriptors = np.array(total_descriptors).reshape(-1, 1)
+        total_MD = np.array(total_MD).reshape(-1, 1)
+        total_VO = np.array(total_VO).reshape(-1, 1)
+        total_YSS = np.array(total_YSS).reshape(-1, 1)
         scaler_MD = MinMaxScaler()
         scaler_VO = MinMaxScaler()
         scaler_YSS = MinMaxScaler()
         scaler_normal = MinMaxScaler()
 
-        norm_MD = scaler_MD.fit_transform(total_MD).tolist()
-        norm_VO = scaler_VO.fit_transform(total_VO).tolist()
-        norm_YSS = scaler_YSS.fit_transform(total_YSS).tolist()
-        norm_normal = scaler_normal.fit_transform(total_descriptors).tolist()
+        norm_MD = scaler_MD.fit_transform(total_MD).reshape(-1).tolist()
+        norm_VO = scaler_VO.fit_transform(total_VO).reshape(-1).tolist()
+        norm_YSS = scaler_YSS.fit_transform(total_YSS).reshape(-1).tolist()
+        norm_normal = scaler_normal.fit_transform(total_descriptors).reshape(-1).tolist()
 
         return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std, norm_MD, norm_VO, norm_YSS, norm_normal
     

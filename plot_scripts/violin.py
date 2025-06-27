@@ -1,16 +1,19 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
+import warnings
 
-XGBoost_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/XGB_data.csv'))
-GP_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GP_data.csv'))
-DT_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/DT_data.csv'))
-RF_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/RF_data.csv'))
-SVM_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/SVM_data.csv'))
-GCN_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GCN_data.csv'))
-GINE_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GINE_data.csv'))
-GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GINE_SSL_data.csv'))
-GINE_SSL_desp_data = pd.DataFrame(pd.read_csv('./plot_scripts/plot_data/GINE_SSL_descriptor_data.csv'))
+warnings.filterwarnings('ignore')
+
+XGBoost_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/XGB_data.csv'))
+GP_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GP_data.csv'))
+DT_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/DT_data.csv'))
+RF_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/RF_data.csv'))
+SVM_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/SVM_data.csv'))
+GCN_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_data.csv'))
+GINE_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_data.csv'))
+GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_data.csv'))
+GINE_SSL_desp_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv'))
 
 xgb_auc = XGBoost_data['AUC'].values.tolist()
 gp_auc = GP_data['AUC'].values.tolist()

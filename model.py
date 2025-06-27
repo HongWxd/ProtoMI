@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention, LayerNorm
 from torch_geometric.nn import GCNConv, GINEConv, global_mean_pool
-from .layers.attention import DAN
+from layers.attention import DAN, DANLayer
 
 class GCN(torch.nn.Module):
     def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
@@ -82,10 +82,26 @@ class GINE_descriptor(torch.nn.Module):
         self.desp_embed = Linear(args.desp_dim, args.hidden_channels * args.desp_dim)
         self.desp_num = args.desp_dim
         self.attn_norm = LayerNorm(args.hidden_channels)
+
+        self.ffn_lin1 = Linear(hidden_channels, args.d_ff)
+        self.relu = ReLU()
+        self.ffn_lin2 = Linear(args.d_ff, hidden_channels)
+        self.ffn_dropout = Dropout(dropout)
+        self.ffn_attn_norm = LayerNorm(hidden_channels)
+
+        self.dan1 = DAN(hidden_channels, args.num_heads, args.desp_dim, args.d_ff, dropout, args.d_keys, args.d_values)
         
         self.lin1 = Linear(hidden_channels, hidden_channels)
         self.lin2 = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
+
+    def feedforward(self, x):
+        x = self.ffn_lin1(x)
+        x = self.relu(x)
+        x = self.ffn_dropout(x)
+        x = self.ffn_lin2(x)
+
+        return x
 
     def forward(self, x, edge_index, edge_attr, batch, descriptors):
         descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)# some descriptors are None
@@ -103,16 +119,8 @@ class GINE_descriptor(torch.nn.Module):
         x = self.dropout(x)
 
         x = global_mean_pool(x, batch)# [batchsize, hidden_channels]
-        B = x.shape[0]
-        H = x.shape[1]
-        N = self.desp_num
-        
-        desp_embed = self.desp_embed(descriptors) 
-        desp_embed = desp_embed.view(B, N, H) # [batchsize, num_desp_features * hidden_channels] --> [batchsize, num_desp_features, hidden_channels]
-        x_in = x.unsqueeze(1)  # [B, 1, hidden_channels]
 
-        x, _ = self.multihead_attn(x_in, desp_embed, desp_embed)
-        x = x_in + self.attn_norm(x)
+        x = self.dan1(x, descriptors)
         # desp_out, _ = self.multihead_attn(desp_embed, x_in, x_in) # [B, N, H]
         x = x.squeeze(1)
 

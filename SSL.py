@@ -20,6 +20,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='Batch size for t
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
+parser.add_argument('--d_ff', type=int, default=512, help='Number of model dimension')
 parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
@@ -31,6 +32,8 @@ parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
+parser.add_argument('--d_keys', type=int, default=128, help='Number of descriptors')
+parser.add_argument('--d_values', type=int, default=128, help='Number of descriptors')
 
 args = parser.parse_args()
 device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
