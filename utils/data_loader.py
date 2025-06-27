@@ -142,13 +142,14 @@ class MoleculeDataset(Dataset):
         sorted_cids = []
         for i, cid in enumerate(tqdm(self.cids, desc='Load all descriptors')):
             _, formula, smile, _, _, _, _,_ = self.read_from_one_call(cid)
-            try:
-                mol = Chem.MolFromSmiles(smile)
-            except:
+            mol = Chem.MolFromSmiles(smile)
+            if mol == None:
                 continue
 
             Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor = get_reproted_descriptor(formula, mol)
             if Normal_descriptors == None:
+                continue
+            elif np.isnan(Normal_descriptors).any():
                 continue
 
             total_descriptors.append(Normal_descriptors)
@@ -157,7 +158,10 @@ class MoleculeDataset(Dataset):
             total_YSS.append(YSS_descriptor)
             sorted_cids.append(cid)
         
+        print(len(total_descriptors))
+        
         total_descriptors = np.array(total_descriptors)
+        total_descriptors = np.nan_to_num(total_descriptors, nan=0.0)
         total_MD = np.array(total_MD)
         total_VO = np.array(total_VO)
         total_YSS = np.array(total_YSS)
