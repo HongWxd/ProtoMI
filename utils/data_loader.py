@@ -24,7 +24,10 @@ class MoleculeDataset(Dataset):
         self.load_descriptor = load_descriptors
         self.cids = list(sorted(set(self.searching_space_df['cid'].values)))
         self.cids = [int(i) for i in self.cids]
-
+        
+        if self.load_descriptor:
+            self.norm_MD, self.norm_VO, self.norm_YSS, self.norm_normal, self.sorted_cids = self.load_descriptors()
+        
         if self.is_baseline:
             self.data = self.baseline_data()
             self.analysis = False
@@ -35,30 +38,20 @@ class MoleculeDataset(Dataset):
         if self.analysis:
             if self.load_flag:
                 self.analysis_dataset(self.data)
-        
-        if self.load_descriptor:
-            self.norm_MD, self.norm_VO, self.norm_YSS, self.norm_normal = self.load_descriptors()
 
     def load_data(self):
         labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
-        # cids = list(sorted(set(self.searching_space_df['cid'].values)))
-        # cids = [int(i) for i in cids]
 
         # for normalization purpose
         mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std = self.get_mean_std_values()
 
         data_list = []
-        for cid in tqdm(self.cids, desc='Converting smiles data to graph data'):
+        for cid in tqdm(self.sorted_cids, desc='Converting smiles data to graph data'):
             # get the graph data for each compound
             _, formula, smile, _, _, _, _, label = self.read_from_one_call(cid)
             x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this compound
-
-            try:
-                comp = Composition(formula)
-            except:
-                continue
 
             # get the mask for semi-supervised learning
             if cid in labeled_cid_list:
@@ -111,14 +104,10 @@ class MoleculeDataset(Dataset):
         total_all_masses = []
         total_all_vdw = []
         total_all_covalent = []
-        for cid in tqdm(self.cids, desc='Get some statistical values of data'):
+        for cid in tqdm(self.sorted_cids, desc='Get some statistical values of data'):
             _, formula, smile, _, _, _, _,_ = self.read_from_one_call(cid)
             mol, all_masses, all_vdw, all_covalent = get_statistical_values(smile)
             if all_masses == None:
-                continue
-            try:
-                comp = Composition(formula)
-            except:
                 continue
 
             total_all_masses += all_masses
@@ -132,9 +121,6 @@ class MoleculeDataset(Dataset):
         return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std
     
     def load_descriptors(self):
-        # cids = list(sorted(set(self.searching_space_df['cid'].values)))
-        # cids = [int(i) for i in cids]
-
         total_descriptors = []
         total_MD = []
         total_VO = []
@@ -158,8 +144,6 @@ class MoleculeDataset(Dataset):
             total_YSS.append(YSS_descriptor)
             sorted_cids.append(cid)
         
-        print(len(total_descriptors))
-        
         total_descriptors = np.array(total_descriptors)
         total_descriptors = np.nan_to_num(total_descriptors, nan=0.0)
         total_MD = np.array(total_MD)
@@ -175,7 +159,7 @@ class MoleculeDataset(Dataset):
         norm_YSS = scaler_YSS.fit_transform(total_YSS)
         norm_normal = scaler_normal.fit_transform(total_descriptors)
 
-        return norm_MD, norm_VO, norm_YSS, norm_normal
+        return norm_MD, norm_VO, norm_YSS, norm_normal, sorted_cids
     
     def save_labeled_data(self):
         labeled_data_list = []
@@ -187,10 +171,8 @@ class MoleculeDataset(Dataset):
     
     # smiles data
     def baseline_data(self):
-        # cids = list(sorted(set(self.searching_space_df['cid'].values)))
-        # cids = [int(i) for i in cids]
         baseline_data = []
-        for cid in tqdm(self.cids):
+        for cid in tqdm(self.sorted_cids):
             _, _, smile, _, _, _, _, label = self.read_from_one_call(cid)
             smile = str(smile)
             label = int(label)
