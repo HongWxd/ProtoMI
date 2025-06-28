@@ -29,7 +29,7 @@ class MoleculeDataset(Dataset):
             self.norm_MD, self.norm_VO, self.norm_YSS, self.norm_normal, self.sorted_cids = self.load_descriptors()
         
         if self.is_baseline:
-            self.data = self.baseline_data()
+            self.baseline_data = self.load_baseline_data()
             self.analysis = False
         else:
             if self.load_flag:
@@ -170,7 +170,7 @@ class MoleculeDataset(Dataset):
         return labeled_data_list
     
     # smiles data
-    def baseline_data(self):
+    def load_baseline_data(self):
         baseline_data = []
         for cid in tqdm(self.sorted_cids):
             _, _, smile, _, _, _, _, label = self.read_from_one_call(cid)
