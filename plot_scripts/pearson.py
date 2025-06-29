@@ -3,23 +3,20 @@ from tqdm import tqdm
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
-with open('./data/all_data_descriptors.pkl', 'rb') as f:
-    all_data = pickle.load(f)
+with open('./data/norm_normal.pkl', 'rb') as f:
+    desp_data = pickle.load(f)
 
-cids = []
-descriptor_list = []
-for data in tqdm(all_data):
-    cids = data.cid
-    descriptors = data.descriptors.numpy()
-    descriptor_list.append(descriptors[0])
-    print(descriptors[0])
-
-df = pd.DataFrame(descriptor_list)
+df = pd.DataFrame(desp_data)
 corr_matrix = df.corr(method='pearson')
-
+feature_name_df = pd.DataFrame(pd.read_excel('./plot_scripts/pearson_data/chemical_attributes.xlsx'))
+features_name = feature_name_df['Attributes'].values.tolist()
+corr_matrix.index = features_name
+corr_matrix.columns = features_name
 
 plt.figure(figsize=(12, 10))
-sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm')
+sns.heatmap(corr_matrix, annot=False, cmap="Spectral")
 plt.title("Feature Pearson Correlation Heatmap")
+plt.tight_layout()
 plt.savefig('./figs/pearson_descriptors.png', dpi=600)

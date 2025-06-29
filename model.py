@@ -39,11 +39,31 @@ class GINE(torch.nn.Module):
         nn3 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv3 = GINEConv(nn3, edge_dim=num_edge_features)
 
+        self.multihead_attn = MultiheadAttention(hidden_channels, args.num_heads, batch_first=True)
+        self.attn_norm = LayerNorm(hidden_channels)
+
+        self.ffn_lin1 = Linear(hidden_channels, args.d_ff)
+        self.relu = ReLU()
+        self.ffn_lin2 = Linear(args.d_ff, hidden_channels)
+        self.ffn_dropout = Dropout(dropout)
+        self.ffn_attn_norm = LayerNorm(hidden_channels)
+
+        self.dan_layer1 = DANLayer(hidden_channels, args.num_heads, args.d_keys, args.d_values, args.d_ff, dropout)
+
         self.lin1 = Linear(hidden_channels, hidden_channels)
         self.lin2 = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
-    def forward(self, x, edge_index, edge_attr, batch, descriptors):
+
+    def feedforward(self, x):
+        x = self.ffn_lin1(x)
+        x = self.relu(x)
+        x = self.ffn_dropout(x)
+        x = self.ffn_lin2(x)
+
+        return x
+
+    def forward(self, x, edge_index, edge_attr, batch, descriptors): 
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
         x = self.dropout(x)
@@ -57,6 +77,16 @@ class GINE(torch.nn.Module):
         x = self.dropout(x)
 
         x = global_mean_pool(x, batch)
+        x = x.unsqueeze(1)
+        x, _ = self.multihead_attn(x, x, x)
+        x_in = x
+        x = x_in + self.attn_norm(x) # [B, 1, H]
+
+        x_ffn = x
+        x = self.feedforward(x)
+        x = x_ffn + self.ffn_attn_norm(x)
+        x = self.dan_layer1(x)
+        x = x.squeeze(1)
 
         x = self.lin1(x)
         x = F.relu(x)
@@ -104,8 +134,8 @@ class GINE_descriptor(torch.nn.Module):
         return x
 
     def forward(self, x, edge_index, edge_attr, batch, descriptors):
-        descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)# some descriptors are None
-        print(descriptors)
+        # descriptors = torch.nan_to_num(descriptors, nan=0.0, posinf=1e6, neginf=-1e6)# some descriptors are None
+        # print(descriptors)
 
         x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)

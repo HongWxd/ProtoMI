@@ -30,10 +30,10 @@ class MoleculeDataset(Dataset):
         
         if self.is_baseline:
             self.baseline_data = self.load_baseline_data()
-            self.analysis = False
-        else:
-            if self.load_flag:
-                self.data = self.load_data()
+            # self.analysis = False
+
+        if self.load_flag:
+            self.data = self.load_data()
 
         if self.analysis:
             if self.load_flag:

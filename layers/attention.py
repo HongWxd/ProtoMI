@@ -60,6 +60,8 @@ class DAN(torch.nn.Module): # Descriptor Attention Network
         self.ffn_attn_norm = LayerNorm(hidden_channels)
 
         self.dan_layer1 = DANLayer(hidden_channels, num_heads, d_keys, d_values, d_ff, dropout)
+        self.dan_layer2 = DANLayer(hidden_channels, num_heads, d_keys, d_values, d_ff, dropout)
+        self.dan_layer3 = DANLayer(hidden_channels, num_heads, d_keys, d_values, d_ff, dropout)
     
     def feedforward(self, x):
         x = self.lin1(x)
@@ -86,6 +88,8 @@ class DAN(torch.nn.Module): # Descriptor Attention Network
         x = x_ffn + self.ffn_attn_norm(x)
 
         x = self.dan_layer1(x)
+        x = self.dan_layer2(x)
+        x = self.dan_layer3(x)
 
         return x
     

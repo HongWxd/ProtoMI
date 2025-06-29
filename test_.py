@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from rdkit import Chem
 from smiles_encoder import SmilesEncoder
 import matminer.featurizers.composition as mm_composition
@@ -7,6 +8,7 @@ from pymatgen.core import Composition
 from ase import Atoms
 from dscribe.descriptors import SOAP
 from rdkit.Chem import AllChem
+import pickle
 
 # # 示例：一组 SMILES
 # smiles_list = ["C1=CC=CC=C1"]
@@ -15,56 +17,18 @@ from rdkit.Chem import AllChem
 # decoded_smiles = encoder.decode_many(encoded_smiles)
 # print(len(encoded_smiles[0]), decoded_smiles)
 
-def get_SOAP_descriptor(mol, vdw_max):
-    SOAP_mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(SOAP_mol)
-    AllChem.UFFOptimizeMolecule(SOAP_mol)
-    conf = SOAP_mol.GetConformer()
-    positions = []
-    symbols = []
-    for atom in SOAP_mol.GetAtoms():
-        pos = conf.GetAtomPosition(atom.GetIdx())
-        positions.append([pos.x, pos.y, pos.z])
-        symbols.append(atom.GetSymbol())
-    positions = np.array(positions)
+with open('./data/norm_normal.pkl', 'rb') as f:
+    desp_data = pickle.load(f)
 
-    ase_mol = Atoms(symbols=symbols, positions=positions)
+with open('./data/all_data.pkl', 'rb') as f:
+    all_data = pickle.load(f)
 
-    species = list(set(symbols))
-    soap = SOAP(
-        species=species,
-        periodic=False,
-        r_cut=2*vdw_max,
-        n_max=8,
-        l_max=6,
-    )
-    soap_descriptor = soap.create(ase_mol)
+desp_data = torch.tensor(desp_data, dtype=torch.float)
 
-    return soap_descriptor
+train_data = []
+for desp, graph in zip(desp_data, all_data):
+    graph.descriptors = desp.unsqueeze(0)
+    train_data.append(graph)
 
-def get_reproted_descriptor(formula, mol, vdw_max):
-    comp = Composition(formula)
-    print(comp)
-    md_featurizer = mm_composition.Meredig()
-    MD_descriptor = md_featurizer.featurize(comp)
+    break
 
-    # os_featurizer = mm_composition.OxidationStates()
-    # OS_descriptor = os_featurizer.featurize(comp)
-
-    sc_featurizer = mm_structure.StructuralComplexity()
-
-    vo_featurizer = mm_composition.ValenceOrbital()
-    VO_descriptor = vo_featurizer.featurize(comp)
-
-    yss_featurizer = mm_composition.YangSolidSolution()
-    YSS_descriptor = yss_featurizer.featurize(comp)
-
-    SOAP_descriptor = get_SOAP_descriptor(mol, vdw_max)
-
-    return MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor
-
-comp = Composition('C7H9BO2S')
-mol = Chem.MolFromSmiles('B(CSC1=CC=CC=C1)(O)O')
-vdw_max = 8.0
-MD_descriptor, VO_descriptor, YSS_descriptor, SOAP_descriptor = get_reproted_descriptor(comp, mol, vdw_max)
-print(len(MD_descriptor), len(VO_descriptor), (YSS_descriptor), SOAP_descriptor.shape)

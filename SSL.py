@@ -28,7 +28,7 @@ parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cro
 parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
 parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
-parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
+parser.add_argument('--warm_up_epoch', type=int, default=40, help='Self training warm up epoch period')
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
@@ -118,8 +118,18 @@ def evaluate(model, loader, device):
 
     return auc_score, precision, recall, f1, total_samples, total_loss
 
-with open('./data/all_data_descriptors.pkl', 'rb') as f:
+# load the graph data and descriptors data
+with open('./data/norm_normal.pkl', 'rb') as f:
+    desp_data = pickle.load(f)
+with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
+
+merged_data = []
+desp_data = torch.tensor(desp_data, dtype=torch.float)
+for desp, graph in zip(tqdm(desp_data, desc='Loading training data...'), all_data):
+    graph.descriptors = desp.unsqueeze(0)
+    merged_data.append(graph)
+all_data = merged_data
 
 best_fold = 0
 overall_best_auc = 0
@@ -207,6 +217,9 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                     print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
                     pratical_epoch = epoch
                     break  # stop training early
+        
+        if pratical_epoch == 0:
+            pratical_epoch == epoch
 
         avg_train_loss = total_train_loss / train_samples
         avg_test_loss = test_loss / test_samples
@@ -245,7 +258,7 @@ print(f'Best fold: {best_fold}')
 
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/plot_data/GINE_SSL_descriptor_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv', index=False)
 
 if best_model_state_dict is not None:
     torch.save(best_model_state_dict, './checkpoints/best_model.pth')
