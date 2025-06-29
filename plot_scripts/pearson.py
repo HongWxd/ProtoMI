@@ -12,6 +12,7 @@ df = pd.DataFrame(desp_data)
 corr_matrix = df.corr(method='pearson')
 feature_name_df = pd.DataFrame(pd.read_excel('./plot_scripts/pearson_data/chemical_attributes.xlsx'))
 features_name = feature_name_df['Attributes'].values.tolist()
+print(len(features_name))
 corr_matrix.index = features_name
 corr_matrix.columns = features_name
 
