@@ -58,7 +58,7 @@ with torch.no_grad():
     all_preds = {}
     for data in tqdm(test_loader):
         data = data.to(device)
-        out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         probs = F.softmax(out, dim=-1)
         confs, preds = probs.max(dim=1)
         high_conf_mask = confs >= args.threshold
