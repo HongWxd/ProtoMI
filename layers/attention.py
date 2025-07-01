@@ -88,8 +88,6 @@ class DAN(torch.nn.Module): # Descriptor Attention Network
         x = x_ffn + self.ffn_attn_norm(x)
 
         x = self.dan_layer1(x)
-        x = self.dan_layer2(x)
-        x = self.dan_layer3(x)
 
         return x
     
