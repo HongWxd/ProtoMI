@@ -2,7 +2,7 @@ import torch
 import argparse
 import pickle
 from torch_geometric.loader import DataLoader
-from model import GCN, GINE
+from model import GCN, GINE, GINE_descriptor
 from tqdm import tqdm
 import pandas as pd
 import torch.nn.functional as F
@@ -21,19 +21,35 @@ parser.add_argument('--patience', type=int, default=10, help='Patience for early
 parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
 parser.add_argument('--threshold', type=float, default=1.0, help='threshold of self training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data.csv', help='the path of searching space file')
+parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
+parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
+parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
+parser.add_argument('--d_keys', type=int, default=128, help='Number of descriptors')
+parser.add_argument('--d_values', type=int, default=128, help='Number of descriptors')
+parser.add_argument('--d_ff', type=int, default=512, help='Number of model dimension')
 
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
+# load the graph data and descriptors data
+with open('./data/norm_normal.pkl', 'rb') as f:
+    desp_data = pickle.load(f)
 with open('./data/all_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
+
+merged_data = []
+desp_data = torch.tensor(desp_data, dtype=torch.float)
+for desp, graph in zip(tqdm(desp_data, desc='Loading training data...'), all_data):
+    graph.descriptors = desp.unsqueeze(0)
+    merged_data.append(graph)
+all_data = merged_data
 
 test_data = [i for i in all_data if i.mask == False]
 test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-model = GINE(num_node_features=test_data[0].n_node_features, num_edge_features=test_data[0].n_edge_features, 
+model = GINE_descriptor(num_node_features=test_data[0].n_node_features, num_edge_features=test_data[0].n_edge_features, 
         hidden_channels=args.hidden_channels,
-        num_classes=args.num_classes, dropout=args.dropout).to(device)
+        num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 model.load_state_dict(torch.load('./checkpoints/best_model.pth')) # load the checkpoints
 print('Model is loaded!')
 
