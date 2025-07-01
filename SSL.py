@@ -206,6 +206,8 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                 overall_best_auc = test_auc
                 best_model_state_dict = model.state_dict()
                 best_fold = fold + 1
+            else:
+                pratical_epoch = epoch + 1
         else:
             if epoch > args.warm_up_epoch and early_stop_flag == 1:
                 early_stop_counter += 1
@@ -217,9 +219,10 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
                     print(f"Early stopping at epoch {epoch - 1} for fold {fold + 1}")
                     pratical_epoch = epoch
                     break  # stop training early
-        
-        if pratical_epoch == 0:
-            pratical_epoch == epoch
+                else:
+                    pratical_epoch == epoch
+            else:
+                pratical_epoch == epoch
 
         avg_train_loss = total_train_loss / train_samples
         avg_test_loss = test_loss / test_samples

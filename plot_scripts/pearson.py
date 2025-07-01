@@ -16,8 +16,20 @@ print(len(features_name))
 corr_matrix.index = features_name
 corr_matrix.columns = features_name
 
+abs_corr = corr_matrix.abs()
+np.fill_diagonal(abs_corr.values, 0)
+
+mask = (abs_corr <= 0.8).all(axis=1)
+retained_features = abs_corr.index[mask].tolist()
+
+print(f"保留的特征数量: {len(retained_features)}")
+print(f"保留的特征列表:\n{retained_features}")
+
+filtered_corr = corr_matrix.loc[retained_features, retained_features]
+print(filtered_corr)
+
 plt.figure(figsize=(12, 10))
-sns.heatmap(corr_matrix, annot=False, cmap="Spectral")
+sns.heatmap(filtered_corr, annot=False, cmap="Spectral")
 plt.title("Feature Pearson Correlation Heatmap")
 plt.tight_layout()
 plt.savefig('./figs/pearson_descriptors.png', dpi=600)
