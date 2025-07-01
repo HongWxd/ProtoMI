@@ -52,4 +52,4 @@ sns.stripplot(x="Model", y="AUC", data=df, color='black', size=6, jitter=True, a
 plt.title("AUC Score in Different Model after 10-folds Cross Validation")
 plt.grid(axis="y", linestyle="--", alpha=0.8)
 plt.tight_layout()
-plt.savefig('./figs/violin.png', dpi=600)
+plt.savefig('./figs/violin_recall.png', dpi=600)
