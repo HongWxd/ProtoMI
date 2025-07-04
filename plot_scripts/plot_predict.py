@@ -32,7 +32,7 @@ def plot_ball_stick():
             nx.draw(mol, with_labels=True, labels = elements, pos=nx.spring_layout(mol))
             plt.gca().set_aspect('equal')
             plt.tight_layout()
-            plt.savefig(f'./figs/labeled/{cid}.png', dpi=300)
+            plt.savefig(f'./figs/ball_stick_1/{cid}.png', dpi=300)
         except:
             continue
 
@@ -60,9 +60,9 @@ def plot_ball_stick():
 def plot_distribution():
     df_1 = pd.DataFrame(pd.read_csv('./data/predict_1.csv'))
     smiles_1 = (df_1['smile'].values.tolist())
-    df_0 = pd.DataFrame(pd.read_csv('./data/predict_0.csv'))
-    smiles_0 = (df_0['smile'].values.tolist())
-    smiles = smiles_1 + smiles_0
+    # df_0 = pd.DataFrame(pd.read_csv('./data/predict_0.csv'))
+    # smiles_0 = (df_0['smile'].values.tolist())
+    smiles = smiles_1
     labeled_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
     labeled_smile = (labeled_df['smile'].values.tolist())
     label = (labeled_df['label'].values.tolist())
@@ -71,9 +71,11 @@ def plot_distribution():
     none_smiles = []
     new_smiles = []
     for i, smile in enumerate(smiles):
-        # if i > 200:
-        #     break        
-        new_smiles.append(smile)
+        if smile.endswith('(O)O'):
+            new_smiles.append(smile)
+        
+        if i > 1500:
+            break
     new_smiles = new_smiles + labeled_smile
 
     mols = []
@@ -93,8 +95,10 @@ def plot_distribution():
     X_scaled = scaler.fit_transform(fps)
 
     # t-NSE none-linear
-    X_embedded = TSNE(n_components=2, learning_rate='auto',
-                    init='random', perplexity=3).fit_transform(X_scaled)
+    pca = PCA(n_components=5)
+    X_embedded = pca.fit_transform(X_scaled)
+    # X_embedded = TSNE(n_components=2, learning_rate='auto',
+    #                 init='random', perplexity=3).fit_transform(X_scaled)
 
     plt.figure()
     colors = ["navy", "turquoise", "darkorange", "yellowgreen"]
@@ -109,8 +113,7 @@ def plot_distribution():
     for smile in tqdm(new_smiles):
         if smile in smiles_1:
             y.append(1)
-        elif smile in smiles_0:
-            y.append(0)
+
     
     for smile, label in zip(tqdm(labeled_smile), label):
         if int(label) == 1:
@@ -134,6 +137,7 @@ def plot_distribution():
     plt.legend(loc="best", shadow=False, scatterpoints=1)
     plt.title("t-SNE of prediction molecule")
     plt.tight_layout()
-    plt.savefig('./figs/predict_t-SNE.jpg', dpi=600)
+    plt.savefig('./figs/predict_PCA.jpg', dpi=600)
 
-plot_ball_stick()
+# plot_ball_stick()
+plot_distribution()
