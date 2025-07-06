@@ -198,7 +198,7 @@ def plot_kmeans_clusters(all_embeddings, n_clusters):
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     labels_kmeans = kmeans.fit_predict(all_embeddings)
     kmeans_result = labels_kmeans
-    reducer = umap.UMAP()
+    reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
 
     plt.figure(figsize=(8,6))
@@ -212,7 +212,7 @@ def plot_dbscan_clusters(all_embeddings):
     dbscan = DBSCAN(eps=0.5, min_samples=5)
     labels_dbscan = dbscan.fit_predict(all_embeddings)
     dbscan_result = labels_dbscan
-    reducer = umap.UMAP()
+    reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
 
     plt.figure(figsize=(8,6))
@@ -226,7 +226,7 @@ def plot_meanshift_clusters(all_embeddings, n_clusters):
     agglo = AgglomerativeClustering(n_clusters=n_clusters)
     labels_agglo = agglo.fit_predict(all_embeddings)
     agglo_results = labels_agglo
-    reducer = umap.UMAP()
+    reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
 
     plt.figure(figsize=(8,6))
@@ -275,7 +275,7 @@ with torch.no_grad():
 all_embeddings = all_embeddings[:-1]
 all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
 print(all_embeddings.shape)
-n_clusters = 10
+n_clusters = 6
 
 scaler = StandardScaler()
 all_embeddings_scaled = scaler.fit_transform(all_embeddings)

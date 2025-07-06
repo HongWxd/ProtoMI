@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import umap
 import torch
 import argparse
 from torch_geometric.loader import DataLoader
@@ -14,6 +15,7 @@ from sklearn.model_selection import train_test_split
 import imageio.v2 as imageio
 import os
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.preprocessing import StandardScaler
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
@@ -369,8 +371,12 @@ def visualize_embeddings(model, dataloader, epoch, original_train_data, args):
     flags = np.array([item for sublist in all_flags for item in sublist])
     # flags = torch.cat(all_flags, dim=0).numpy()
 
-    reducer = PCA(n_components=2)
-    embeds_2d = reducer.fit_transform(embeds)
+    # reducer = PCA(n_components=2)
+    # embeds_2d = reducer.fit_transform(embeds)
+    scaler = StandardScaler()
+    all_embeddings_scaled = scaler.fit_transform(embeds)
+    reducer = umap.UMAP(random_state=42)
+    embeds_2d = reducer.fit_transform(all_embeddings_scaled)
 
     plt.figure(figsize=(6, 6))
     num_classes = len(np.unique(labels))
