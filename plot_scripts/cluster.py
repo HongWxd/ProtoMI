@@ -201,8 +201,14 @@ def plot_kmeans_clusters(all_embeddings, n_clusters):
     reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
 
-    plt.figure(figsize=(8,6))
+    # reducer = umap.UMAP(n_components=3, random_state=42)
+    # emb_3d = reducer.fit_transform(all_embeddings)
+
+    plt.figure(figsize=(8, 6))
     plt.scatter(emb_2d[:,0], emb_2d[:,1], c=kmeans_result, cmap='tab10', s=10)
+
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(emb_3d[:, 0], emb_3d[:, 1], emb_3d[:, 2], c=kmeans_result, cmap='tab10', s=10)
     plt.title('UMAP projection with KMeans clusters')
     plt.tight_layout()
     plt.savefig('./figs/KMeans_clusters.png')
@@ -281,5 +287,5 @@ scaler = StandardScaler()
 all_embeddings_scaled = scaler.fit_transform(all_embeddings)
 
 plot_kmeans_clusters(all_embeddings_scaled, n_clusters)
-plot_dbscan_clusters(all_embeddings_scaled)
-plot_meanshift_clusters(all_embeddings_scaled, n_clusters)
+# plot_dbscan_clusters(all_embeddings_scaled)
+# plot_meanshift_clusters(all_embeddings_scaled, n_clusters)
