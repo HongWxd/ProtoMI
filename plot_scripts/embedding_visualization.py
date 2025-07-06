@@ -24,7 +24,7 @@ parser.add_argument('--num_classes', type=int, default=2, help='Number of classe
 parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--d_ff', type=int, default=512, help='Number of model dimension')
-parser.add_argument('--epoch', type=int, default=150, help='Number of training epochs')
+parser.add_argument('--epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
 parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cross validation')
@@ -371,12 +371,13 @@ def visualize_embeddings(model, dataloader, epoch, original_train_data, args):
     flags = np.array([item for sublist in all_flags for item in sublist])
     # flags = torch.cat(all_flags, dim=0).numpy()
 
-    # reducer = PCA(n_components=2)
-    # embeds_2d = reducer.fit_transform(embeds)
     scaler = StandardScaler()
     all_embeddings_scaled = scaler.fit_transform(embeds)
-    reducer = umap.UMAP(random_state=42)
+    reducer = PCA(n_components=2)
     embeds_2d = reducer.fit_transform(all_embeddings_scaled)
+
+    # reducer = umap.UMAP(random_state=42)
+    # embeds_2d = reducer.fit_transform(all_embeddings_scaled)
 
     plt.figure(figsize=(6, 6))
     num_classes = len(np.unique(labels))
@@ -513,4 +514,4 @@ for epoch in tqdm(range(1, args.epoch + 1), desc='Training'):
 
     visualize_embeddings(model, train_loader, epoch, original_data, args)
 
-make_gif(args, image_folder='./figs/SSL_desp_embedding_evolution.gif')
+make_gif(args, image_folder='./figs/embedding_evol/')
