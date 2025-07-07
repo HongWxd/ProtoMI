@@ -196,8 +196,8 @@ args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
-    pred_embeddings = all_embeddings[:3904]
-    labeled_embeddings = all_embeddings[3904:]
+    pred_embeddings = all_embeddings[:3926]
+    labeled_embeddings = all_embeddings[3926:]
 
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     labels_kmeans = kmeans.fit_predict(pred_embeddings)
@@ -205,17 +205,23 @@ def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
 
     reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
-    pred_emb_2d = emb_2d[:3904]
-    labeled_emb_2d = emb_2d[3904:]
+    pred_emb_2d = emb_2d[:3926]
+    labeled_emb_2d = emb_2d[3926:]
 
     df = pd.DataFrame()
-    df['cid'] = cids.tolist()
-    df['formula'] = formulas
-    df['smiles'] = smiles
+    df['cid'] = cids[:3926].tolist()
+    df['formula'] = formulas[:3926]
+    df['smiles'] = smiles[:3926]
     df['x'] = pred_emb_2d[:, 0]
     df['y'] = pred_emb_2d[:, 1]
     df['cluster'] = [i + 1 for i in kmeans_result.tolist()]
-    
+
+    labeled_df = pd.DataFrame()
+    labeled_df['cid'] = cids[3926:].tolist()
+    labeled_df['formula'] = formulas[3926:]
+    labeled_df['smiles'] = smiles[3926:]
+    labeled_df['x'] = labeled_emb_2d[:, 0]
+    labeled_df['y'] = labeled_emb_2d[:, 1]
 
     # reducer = umap.UMAP(n_components=3, random_state=42)
     # emb_3d = reducer.fit_transform(all_embeddings)
@@ -235,10 +241,10 @@ def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
                     color=colors[cluster_id], 
                     marker=marker_list[cluster_id % len(marker_list)],
                     label=f'Cluster {cluster_id + 1}', 
-                    s=25)
+                    s=20)
         
     # plot labeled points
-    plt.scatter(labeled_emb_2d[:,0], labeled_emb_2d[:,1], marker='1', color=sns.color_palette("Set2")[-1], label='Real label', s=35)
+    plt.scatter(labeled_emb_2d[:,0], labeled_emb_2d[:,1], marker='2', color='red', label='Real label', s=35)
 
     # ax = fig.add_subplot(111, projection='3d')
     # ax.scatter(emb_3d[:, 0], emb_3d[:, 1], emb_3d[:, 2], c=kmeans_result, cmap='tab10', s=10)
@@ -248,6 +254,7 @@ def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
     plt.grid(True)
     plt.savefig('./figs/KMeans_clusters.png', dpi=600)
     df.to_csv('./data/kmeans_clusters.csv', index=False)
+    labeled_df.to_csv('./data/labeled_UMAP.csv', index=False)
 
 def plot_dbscan_clusters(all_embeddings):
     # DBSCAN
@@ -330,9 +337,11 @@ with torch.no_grad():
         out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         embeds = model.embeds.cpu()
         labeled_embeddings.append(embeds)
+        cid = data.cid.cpu()
+        cids.append(cid)
 
-all_embeddings = all_embeddings[:-1]
-cids = cids[:-1]
+# all_embeddings = all_embeddings[:-1]
+# cids = cids[:-1]
 all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
 labeled_embeddings = torch.cat(labeled_embeddings, dim=0).numpy()
 total_embeddings = np.concatenate((all_embeddings, labeled_embeddings), axis=0)
