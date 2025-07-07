@@ -196,17 +196,24 @@ args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
+    pred_embeddings = all_embeddings[:3904]
+    labeled_embeddings = all_embeddings[3904:]
+
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    labels_kmeans = kmeans.fit_predict(all_embeddings)
+    labels_kmeans = kmeans.fit_predict(pred_embeddings)
     kmeans_result = labels_kmeans
+
     reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
+    pred_emb_2d = emb_2d[:3904]
+    labeled_emb_2d = emb_2d[3904:]
+
     df = pd.DataFrame()
     df['cid'] = cids.tolist()
     df['formula'] = formulas
     df['smiles'] = smiles
-    df['x'] = emb_2d[:, 0]
-    df['y'] = emb_2d[:, 1]
+    df['x'] = pred_emb_2d[:, 0]
+    df['y'] = pred_emb_2d[:, 1]
     df['cluster'] = [i + 1 for i in kmeans_result.tolist()]
     
 
@@ -221,14 +228,17 @@ def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
         'H', '*', '+', 'x', 'X', '|', '_', '.', ',', 'P'
     ]
     
+    # plot predicted points
     for cluster_id in range(n_clusters):
         idx = kmeans_result == cluster_id
-        plt.scatter(emb_2d[idx, 0], emb_2d[idx, 1], 
+        plt.scatter(pred_emb_2d[idx, 0], pred_emb_2d[idx, 1], 
                     color=colors[cluster_id], 
                     marker=marker_list[cluster_id % len(marker_list)],
                     label=f'Cluster {cluster_id + 1}', 
-                    s=20)
-    # plt.scatter(emb_2d[:,0], emb_2d[:,1], c=kmeans_result, cmap='tab10', s=10)
+                    s=25)
+        
+    # plot labeled points
+    plt.scatter(labeled_emb_2d[:,0], labeled_emb_2d[:,1], marker='1', color=sns.color_palette("Set2")[-1], label='Real label', s=35)
 
     # ax = fig.add_subplot(111, projection='3d')
     # ax.scatter(emb_3d[:, 0], emb_3d[:, 1], emb_3d[:, 2], c=kmeans_result, cmap='tab10', s=10)
@@ -282,12 +292,19 @@ all_data = merged_data
 
 pred_data = pd.DataFrame(pd.read_csv('data/predict_1.csv'))
 selected_cids = pred_data['cid'].tolist()
+labeled_df = pd.DataFrame(pd.read_csv('data/labeled_data.csv'))
+labeled_cids = labeled_df['cid'].tolist()
 
 selected_data = []
+labeled_data = []
 for graph in all_data:
     if graph.cid in selected_cids:
         selected_data.append(graph)
+    elif graph.cid in labeled_cids:
+        if graph.y == 1:
+            labeled_data.append(graph)
 selected_loader = DataLoader(selected_data, batch_size=args.batch_size, shuffle=False)
+labeled_loader = DataLoader(labeled_data, batch_size=args.batch_size, shuffle=False)
 
 model = GINE_descriptor(num_node_features=selected_data[0].n_node_features, num_edge_features=selected_data[0].n_edge_features, 
         hidden_channels=args.hidden_channels,
@@ -298,8 +315,8 @@ print('Model is loaded!')
 model.eval()
 cids = []
 all_embeddings = []
+labeled_embeddings = []
 with torch.no_grad():
-    all_preds = {}
     for data in tqdm(selected_loader):
         data = data.to(device)
         out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
@@ -307,16 +324,26 @@ with torch.no_grad():
         cid = data.cid.cpu()
         all_embeddings.append(embeds)
         cids.append(cid)
+    
+    for data in tqdm(labeled_loader):
+        data = data.to(device)
+        out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
+        embeds = model.embeds.cpu()
+        labeled_embeddings.append(embeds)
+
 all_embeddings = all_embeddings[:-1]
 cids = cids[:-1]
 all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
+labeled_embeddings = torch.cat(labeled_embeddings, dim=0).numpy()
+total_embeddings = np.concatenate((all_embeddings, labeled_embeddings), axis=0)
 cids = torch.cat(cids, dim=0).numpy()
 print(all_embeddings.shape)
 print(cids.shape)
+print(labeled_embeddings.shape)
 n_clusters = 20
 
 scaler = StandardScaler()
-all_embeddings_scaled = scaler.fit_transform(all_embeddings)
+all_embeddings_scaled = scaler.fit_transform(total_embeddings)
 
 searching_space_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))
 formulas = []
@@ -327,6 +354,6 @@ for cid in cids:
     formulas.append(formula)
     smiles.append(smile)
 
-plot_kmeans_clusters(cids, formulas, smiles, all_embeddings_scaled, n_clusters)
+plot_kmeans_clusters(cids, formulas, smiles, total_embeddings, n_clusters)
 # plot_dbscan_clusters(all_embeddings_scaled)
 # plot_meanshift_clusters(all_embeddings_scaled, n_clusters)
