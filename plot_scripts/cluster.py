@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN, MeanShift, AgglomerativeClustering
 from sklearn.manifold import TSNE
 import torch
+import seaborn as sns
 import argparse
 import pickle
 from torch_geometric.loader import DataLoader
@@ -194,24 +195,49 @@ parser.add_argument('--d_values', type=int, default=128, help='Number of descrip
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
-def plot_kmeans_clusters(all_embeddings, n_clusters):
+def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     labels_kmeans = kmeans.fit_predict(all_embeddings)
     kmeans_result = labels_kmeans
     reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
+    df = pd.DataFrame()
+    df['cid'] = cids.tolist()
+    df['formula'] = formulas
+    df['smiles'] = smiles
+    df['x'] = emb_2d[:, 0]
+    df['y'] = emb_2d[:, 1]
+    df['cluster'] = [i + 1 for i in kmeans_result.tolist()]
+    
 
     # reducer = umap.UMAP(n_components=3, random_state=42)
     # emb_3d = reducer.fit_transform(all_embeddings)
 
-    plt.figure(figsize=(8, 6))
-    plt.scatter(emb_2d[:,0], emb_2d[:,1], c=kmeans_result, cmap='tab10', s=10)
+    plt.figure(figsize=(9, 6))
+    # colors = plt.cm.tab20(np.linspace(0, 1, n_clusters))
+    colors = sns.color_palette("husl", n_clusters)
+    marker_list = [
+        'o', 's', '^', 'v', '<', '>', 'D', 'd', 'p', 'h',
+        'H', '*', '+', 'x', 'X', '|', '_', '.', ',', 'P'
+    ]
+    
+    for cluster_id in range(n_clusters):
+        idx = kmeans_result == cluster_id
+        plt.scatter(emb_2d[idx, 0], emb_2d[idx, 1], 
+                    color=colors[cluster_id], 
+                    marker=marker_list[cluster_id % len(marker_list)],
+                    label=f'Cluster {cluster_id + 1}', 
+                    s=20)
+    # plt.scatter(emb_2d[:,0], emb_2d[:,1], c=kmeans_result, cmap='tab10', s=10)
 
     # ax = fig.add_subplot(111, projection='3d')
     # ax.scatter(emb_3d[:, 0], emb_3d[:, 1], emb_3d[:, 2], c=kmeans_result, cmap='tab10', s=10)
+    plt.legend(title='Cluster Labels', bbox_to_anchor=(1, 1), loc='upper left', ncol=1, markerscale=2)
     plt.title('UMAP projection with KMeans clusters')
     plt.tight_layout()
-    plt.savefig('./figs/KMeans_clusters.png')
+    plt.grid(True)
+    plt.savefig('./figs/KMeans_clusters.png', dpi=600)
+    df.to_csv('./data/kmeans_clusters.csv', index=False)
 
 def plot_dbscan_clusters(all_embeddings):
     # DBSCAN
@@ -270,6 +296,7 @@ model.load_state_dict(torch.load('./checkpoints/best_model.pth')) # load the che
 print('Model is loaded!')
 
 model.eval()
+cids = []
 all_embeddings = []
 with torch.no_grad():
     all_preds = {}
@@ -277,15 +304,29 @@ with torch.no_grad():
         data = data.to(device)
         out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         embeds = model.embeds.cpu()
+        cid = data.cid.cpu()
         all_embeddings.append(embeds)
+        cids.append(cid)
 all_embeddings = all_embeddings[:-1]
+cids = cids[:-1]
 all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
+cids = torch.cat(cids, dim=0).numpy()
 print(all_embeddings.shape)
-n_clusters = 6
+print(cids.shape)
+n_clusters = 20
 
 scaler = StandardScaler()
 all_embeddings_scaled = scaler.fit_transform(all_embeddings)
 
-plot_kmeans_clusters(all_embeddings_scaled, n_clusters)
+searching_space_df = pd.DataFrame(pd.read_csv('./data/searching_space_data.csv'))
+formulas = []
+smiles = []
+for cid in cids:
+    formula = searching_space_df.loc[searching_space_df['cid'] == float(cid), 'formula'].values[0]
+    smile = searching_space_df.loc[searching_space_df['cid'] == float(cid), 'SMILES'].values[0]
+    formulas.append(formula)
+    smiles.append(smile)
+
+plot_kmeans_clusters(cids, formulas, smiles, all_embeddings_scaled, n_clusters)
 # plot_dbscan_clusters(all_embeddings_scaled)
 # plot_meanshift_clusters(all_embeddings_scaled, n_clusters)
