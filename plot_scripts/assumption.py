@@ -33,7 +33,7 @@ warnings.filterwarnings('ignore')
 
 # Load the saved data
 # df = pd.DataFrame(pd.read_csv('./PubChem/processed_data/searching_space_data.csv'))
-df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
+df = pd.DataFrame(pd.read_csv('./data/predict_1.csv'))
 smiles_list = set(df['smile'].values.tolist())
 rep_df = pd.DataFrame(pd.read_csv('./data/labeled_data.csv'))
 rep_smiles_list = set(rep_df['smile'].values.tolist())
@@ -74,10 +74,10 @@ X_scaled = scaler.fit_transform(fps)
 # X_scaled = np.array(fps)
 
 # use the clustering algorithm
-n_clusters = 4
-kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-kmeans.fit(X_scaled)
-labels = kmeans.labels_
+# n_clusters = 20
+# kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+# kmeans.fit(X_scaled)
+# labels = kmeans.labels_
 
 # # PCA linear
 # pca = PCA(n_components=2)
@@ -130,7 +130,7 @@ lw = 2
 # target_names = ['Li', 'Na', 'Li_Na', 'Other']
 # target_names = ['SEI', 'no_SEI', 'Unreported']
 # target_names = ['SEI', 'no_SEI']
-target_names = ['SEI']
+target_names = ['SEI', 'real label']
 
 y = []
 for smile, data_label in zip(tqdm(smiles), data_labels):

@@ -51,7 +51,7 @@ test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 model = GINE_descriptor(num_node_features=test_data[0].n_node_features, num_edge_features=test_data[0].n_edge_features, 
         hidden_channels=args.hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-model.load_state_dict(torch.load('./checkpoints/best_model.pth')) # load the checkpoints
+model.load_state_dict(torch.load('./checkpoints/best_model_with_D.pth')) # load the checkpoints
 print('Model is loaded!')
 
 model.eval()
@@ -106,11 +106,11 @@ pred_1_df = pred_1_df[pred_1_df['weight'] <= 500]
 pred_1_df = pred_1_df[pred_1_df['weight'] >= 100]
 pred_1_df.to_csv('./data/predict_1.csv', index=False)
 
-# pred_0_df = pd.DataFrame()
-# pred_0_df['cid'] = cids_list_0
-# pred_0_df['formula'] = formulas_0
-# pred_0_df['smile'] = smiles_0
-# pred_0_df['weight'] = weight_0
-# # pred_0_df = pred_0_df[pred_0_df['weight'] <= 200]
-# # pred_0_df = pred_0_df[pred_0_df['weight'] >= 100]
-# pred_0_df.to_csv('./data/predict_0.csv', index=False)
+pred_0_df = pd.DataFrame()
+pred_0_df['cid'] = cids_list_0
+pred_0_df['formula'] = formulas_0
+pred_0_df['smile'] = smiles_0
+pred_0_df['weight'] = weight_0
+pred_0_df = pred_0_df[pred_0_df['weight'] <= 500]
+pred_0_df = pred_0_df[pred_0_df['weight'] >= 100]
+pred_0_df.to_csv('./data/predict_0.csv', index=False)

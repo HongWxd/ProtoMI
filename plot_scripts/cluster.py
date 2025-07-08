@@ -195,9 +195,9 @@ parser.add_argument('--d_values', type=int, default=128, help='Number of descrip
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
-def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
-    pred_embeddings = all_embeddings[:3926]
-    labeled_embeddings = all_embeddings[3926:]
+def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters, pred_len):
+    pred_embeddings = all_embeddings[:pred_len]
+    labeled_embeddings = all_embeddings[pred_len:]
 
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     labels_kmeans = kmeans.fit_predict(pred_embeddings)
@@ -205,21 +205,21 @@ def plot_kmeans_clusters(cids, formulas, smiles, all_embeddings, n_clusters):
 
     reducer = umap.UMAP(random_state=42)
     emb_2d = reducer.fit_transform(all_embeddings)
-    pred_emb_2d = emb_2d[:3926]
-    labeled_emb_2d = emb_2d[3926:]
+    pred_emb_2d = emb_2d[:pred_len]
+    labeled_emb_2d = emb_2d[pred_len:]
 
     df = pd.DataFrame()
-    df['cid'] = cids[:3926].tolist()
-    df['formula'] = formulas[:3926]
-    df['smiles'] = smiles[:3926]
+    df['cid'] = cids[:pred_len].tolist()
+    df['formula'] = formulas[:pred_len]
+    df['smiles'] = smiles[:pred_len]
     df['x'] = pred_emb_2d[:, 0]
     df['y'] = pred_emb_2d[:, 1]
     df['cluster'] = [i + 1 for i in kmeans_result.tolist()]
 
     labeled_df = pd.DataFrame()
-    labeled_df['cid'] = cids[3926:].tolist()
-    labeled_df['formula'] = formulas[3926:]
-    labeled_df['smiles'] = smiles[3926:]
+    labeled_df['cid'] = cids[pred_len:].tolist()
+    labeled_df['formula'] = formulas[pred_len:]
+    labeled_df['smiles'] = smiles[pred_len:]
     labeled_df['x'] = labeled_emb_2d[:, 0]
     labeled_df['y'] = labeled_emb_2d[:, 1]
 
@@ -335,6 +335,9 @@ with torch.no_grad():
     for data in tqdm(labeled_loader):
         data = data.to(device)
         out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
+        probs = F.softmax(out, dim=-1)
+        confs, preds = probs.max(dim=1)
+        print(confs, preds)
         embeds = model.embeds.cpu()
         labeled_embeddings.append(embeds)
         cid = data.cid.cpu()
@@ -363,6 +366,6 @@ for cid in cids:
     formulas.append(formula)
     smiles.append(smile)
 
-plot_kmeans_clusters(cids, formulas, smiles, total_embeddings, n_clusters)
+plot_kmeans_clusters(cids, formulas, smiles, total_embeddings, n_clusters, pred_len=len(all_embeddings))
 # plot_dbscan_clusters(all_embeddings_scaled)
 # plot_meanshift_clusters(all_embeddings_scaled, n_clusters)
