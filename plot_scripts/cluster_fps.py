@@ -47,7 +47,7 @@ fps = [Chem.RDKFingerprint(mol) for mol in tqdm(mols)]
 print(len(fps))
 
 # normalization
-n_clusters = 20
+n_clusters = 10
 scaler = MinMaxScaler()
 X_scaled = scaler.fit_transform(fps)
 kmeans = KMeans(n_clusters=n_clusters, random_state=42)
