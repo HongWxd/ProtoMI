@@ -16,7 +16,7 @@ import warnings
 import umap
 import seaborn as sns
 
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 warnings.filterwarnings('ignore')
 
 df = pd.DataFrame(pd.read_csv('./data/predict_1.csv'))

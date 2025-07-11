@@ -10,30 +10,36 @@ from dscribe.descriptors import SOAP
 from rdkit.Chem import AllChem
 import pickle
 import pandas as pd
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import warnings
+import networkx as nx
+import matplotlib.pyplot as plt
+import os
+import pandas as pd
+from pysmiles import read_smiles
+from tqdm import tqdm
+from rdkit import Chem
+from rdkit import DataStructs
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.manifold import TSNE
 
-# # 示例：一组 SMILES
-# smiles_list = ["C1=CC=CC=C1"]
-# encoder = SmilesEncoder(smiles_list)
-# encoded_smiles = encoder.encode_many(smiles_list)
-# decoded_smiles = encoder.decode_many(encoded_smiles)
-# print(len(encoded_smiles[0]), decoded_smiles)
 
-# with open('./data/norm_normal.pkl', 'rb') as f:
-#     desp_data = pickle.load(f)
+smiles_list = ['B(CCC1=CC=CC=C1)(O)O', 'B(C1=CC=CC=C1C#N)(O)O', 'B(C1=CC=C(S1)B(O)O)(O)O', 'B(C1=CC=C(S1)C=O)(O)O', 'B(C1CCCC1)(O)O']
+cids = [65389, 2734610, 2770906, 2773430, 2734327]
 
-# with open('./data/all_data.pkl', 'rb') as f:
-#     all_data = pickle.load(f)
+for cid, smile, i in zip(tqdm(cids), smiles_list, range(1, len(cids) + 1)):
+    try:
+        mol = read_smiles(smile)
 
-# desp_data = torch.tensor(desp_data, dtype=torch.float)
-
-# train_data = []
-# for desp, graph in zip(desp_data, all_data):
-#     graph.descriptors = desp.unsqueeze(0)
-#     train_data.append(graph)
-
-#     break
-
-pred = pd.DataFrame(pd.read_csv('./data/predict_1.csv'))
-formula_list = pd.DataFrame(set(pred['formula'].values.tolist()))
-formula_list.to_csv('./selected_formula.csv', index=False, header=False)
-print(len(formula_list))
+        plt.clf()
+        elements = nx.get_node_attributes(mol, name = "element")
+        nx.draw(mol, with_labels=True, labels = elements, pos=nx.spring_layout(mol))
+        plt.gca().set_aspect('equal')
+        plt.tight_layout()
+        plt.savefig(f'./figs/{cid}_cluster.png', dpi=300)
+    except:
+        continue
