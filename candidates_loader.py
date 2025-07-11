@@ -1,3 +1,12 @@
+import pandas as pd
+import numpy as np
+import torch
+import pickle
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from tqdm import tqdm
+from torch.utils.data import Dataset
+from torch_geometric.data import Data
 import torch
 import argparse
 import pickle
@@ -6,7 +15,6 @@ from model import GCN, GINE, GINE_descriptor
 from tqdm import tqdm
 import pandas as pd
 import torch.nn.functional as F
-
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
@@ -44,11 +52,15 @@ for desp, graph in zip(tqdm(desp_data, desc='Loading training data...'), all_dat
     merged_data.append(graph)
 all_data = merged_data
 
-test_data = [i for i in all_data if i.mask == False]
-print(len(test_data))
-test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
+candidates_df = pd.DataFrame(pd.read_csv('./data/candidates/Recommended.csv'))
+candidates_cids = candidates_df['CID'].values.tolist()
+CASs = candidates_df['CAS'].values.tolist()
+Chemical = candidates_df['Chemical'].values.tolist()
 
-model = GINE_descriptor(num_node_features=test_data[0].n_node_features, num_edge_features=test_data[0].n_edge_features, 
+candidates_data = [i for i in tqdm(all_data) if i.cid in candidates_cids]
+candidates_loader = DataLoader(candidates_data, batch_size=args.batch_size, shuffle=False)
+
+model = GINE_descriptor(num_node_features=candidates_data[0].n_node_features, num_edge_features=candidates_data[0].n_edge_features, 
         hidden_channels=args.hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 model.load_state_dict(torch.load('./checkpoints/best_model_with_D.pth')) # load the checkpoints
@@ -56,62 +68,37 @@ print('Model is loaded!')
 
 model.eval()
 with torch.no_grad():
-    all_preds = {}
-    for data in tqdm(test_loader):
+    all_preds = []
+    all_confs = []
+    all_cids = []
+    for data in tqdm(candidates_loader):
         data = data.to(device)
         out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
         probs = F.softmax(out, dim=-1)
         confs, preds = probs.max(dim=1)
-        high_conf_mask = confs >= args.threshold
 
-        select_preds = preds[high_conf_mask]
-        select_data = data[high_conf_mask]
-        for data, pred in zip(select_data, select_preds):
-            all_preds[data.cid] = pred
+        all_candidates = data.cid.cpu().numpy().tolist()
+        all_confs = confs.cpu().numpy().tolist()
+        all_preds = preds.cpu().numpy().tolist()
 
-searching_space_df = pd.DataFrame(pd.read_csv(args.searching_space_path))
-cids_list_1 = []
-formulas_1 = []
-smiles_1 = []
-weight_1 = []
-cids_list_0 = []
-formulas_0 = []
-smiles_0 = []
-weight_0 = []
-for cid, pred in all_preds.items():
-    # for cid, pred in zip(cids, preds):
-    cid = cid.item()
-    pred = pred.item()
-    formula = searching_space_df.loc[searching_space_df['cid'] == cid, 'formula'].values[0]
-    smile = searching_space_df.loc[searching_space_df['cid'] == cid, 'SMILES'].values[0]
-    weight = searching_space_df.loc[searching_space_df['cid'] == cid, 'weight'].values[0]
+feature_metric = []
+for cid, pred, confs in zip(all_candidates, all_preds, all_confs):
+    features = [i.descriptors for i in candidates_data if i.cid == cid]
+    feature_metric.append(features[0].tolist()[0])
 
-    if pred != 1:
-        cids_list_0.append(cid)
-        formulas_0.append(formula)
-        smiles_0.append(smile)
-        weight_0.append(weight)
-    else:
-        cids_list_1.append(cid)
-        formulas_1.append(formula)
-        smiles_1.append(smile)
-        weight_1.append(weight)
+feature_name_df = pd.DataFrame(pd.read_excel('./plot_scripts/pearson_data/chemical_attributes.xlsx'))
+features_name = feature_name_df['Attributes'].values.tolist()
+features_df = pd.DataFrame(feature_metric, columns=features_name)
 
-pred_1_df = pd.DataFrame()
-pred_1_df['cid'] = cids_list_1
-pred_1_df['formula'] = formulas_1
-pred_1_df['smile'] = smiles_1
-pred_1_df['weight'] = weight_1
-pred_1_df = pred_1_df[pred_1_df['weight'] <= 500]
-pred_1_df = pred_1_df[pred_1_df['weight'] >= 100]
-pred_1_df.to_csv('./data/predict_1.csv', index=False)
+df = pd.DataFrame()
+df['cid'] = all_candidates
+df['CAS'] = CASs
+df['Chemical'] = Chemical
+df['Predicted'] = all_preds
+df['Confidence'] = all_confs
 
-pred_0_df = pd.DataFrame()
-pred_0_df['cid'] = cids_list_0
-pred_0_df['formula'] = formulas_0
-pred_0_df['smile'] = smiles_0
-pred_0_df['weight'] = weight_0
-pred_0_df = pred_0_df[pred_0_df['weight'] <= 500]
-pred_0_df = pred_0_df[pred_0_df['weight'] >= 100]
-pred_0_df.to_csv('./data/predict_0.csv', index=False)
+results_df = pd.concat([df, features_df], axis=1)
+results_df.to_csv('./data/candidates/results.csv', index=False)
+# print(results_df)
+
 
