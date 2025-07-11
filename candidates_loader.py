@@ -1,12 +1,7 @@
 import pandas as pd
-import numpy as np
 import torch
 import pickle
-from rdkit import Chem
-from rdkit.Chem import AllChem
 from tqdm import tqdm
-from torch.utils.data import Dataset
-from torch_geometric.data import Data
 import torch
 import argparse
 import pickle
