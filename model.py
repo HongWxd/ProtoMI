@@ -145,6 +145,7 @@ class GINE_descriptor(torch.nn.Module):
         x = self.conv3(x, edge_index, edge_attr)
         x = F.relu(x)
         x = self.dropout(x)
+        print(x.shape)
 
         x = global_mean_pool(x, batch)# [batchsize, hidden_channels]
 
