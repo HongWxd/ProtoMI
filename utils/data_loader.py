@@ -92,11 +92,11 @@ class MoleculeDataset(Dataset):
             edges_feature += value.n_edge_features
         
         print('---------Here is the basic info of loaded dataset---------')
-        print('number of nodes:', nodes)
-        print('number of edges:', edges)
-        print('nodes feature:', nodes_feature)
-        print('edges feature:', edges_feature)
-        print('number of degrees:', 2 * edges)
+        print('avg nodes:', nodes / self.__len__())
+        print('number of edges:', edges / self.__len__())
+        print('nodes feature:', nodes_feature / self.__len__())
+        print('edges feature:', edges_feature / self.__len__())
+        print('number of degrees:', 2 * edges / self.__len__())
         print('avg degree:', 2 * edges / nodes)
         print('label rate:', len(self.save_labeled_data()) / self.__len__())
     

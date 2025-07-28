@@ -17,23 +17,23 @@ all_data_path = './data/all_data.pkl'
 
 # load the dataset
 dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=True, load_flag=True, load_descriptors=True)
-norm_MD, norm_VO, norm_YSS, norm_normal = dataset.norm_MD, dataset.norm_VO, dataset.norm_YSS, dataset.norm_normal
-print(len(dataset.data), len(norm_normal), len(dataset.baseline_data))
+# norm_MD, norm_VO, norm_YSS, norm_normal = dataset.norm_MD, dataset.norm_VO, dataset.norm_YSS, dataset.norm_normal
+# print(len(dataset.data), len(norm_normal), len(dataset.baseline_data))
 
-with open('./data/norm_MD.pkl', 'wb') as file:
-    pickle.dump(dataset.norm_MD, file)
-with open('./data/norm_VO.pkl', 'wb') as file:
-    pickle.dump(dataset.norm_VO, file)
-with open('./data/norm_YSS.pkl', 'wb') as file:
-    pickle.dump(dataset.norm_YSS, file)
-with open('./data/norm_normal.pkl', 'wb') as file:
-    pickle.dump(dataset.norm_normal, file)
+# with open('./data/norm_MD.pkl', 'wb') as file:
+#     pickle.dump(dataset.norm_MD, file)
+# with open('./data/norm_VO.pkl', 'wb') as file:
+#     pickle.dump(dataset.norm_VO, file)
+# with open('./data/norm_YSS.pkl', 'wb') as file:
+#     pickle.dump(dataset.norm_YSS, file)
+# with open('./data/norm_normal.pkl', 'wb') as file:
+#     pickle.dump(dataset.norm_normal, file)
 
-with open('./data/all_data.pkl', 'wb') as file:
-    pickle.dump(dataset.data, file)
+# with open('./data/all_data.pkl', 'wb') as file:
+#     pickle.dump(dataset.data, file)
 
-with open('./data/baseline_data.pkl', 'wb') as file:
-    pickle.dump(dataset.baseline_data, file)
+# with open('./data/baseline_data.pkl', 'wb') as file:
+#     pickle.dump(dataset.baseline_data, file)
 
 
 
