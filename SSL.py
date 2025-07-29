@@ -240,7 +240,12 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
             else:
                 pratical_epoch = epoch + 1
         else:
-            if epoch > args.warm_up_epoch and early_stop_flag == 1:
+            if args.training_methods == 'SSL':
+                warm_up_epoch = args.warm_up_epoch
+            else:
+                warm_up_epoch = 0
+
+            if epoch > warm_up_epoch and early_stop_flag == 1:
                 early_stop_counter += 1
                 print(f"Early stop counter: {early_stop_counter} / {args.patience}")
                 if early_stop_counter >= args.patience:

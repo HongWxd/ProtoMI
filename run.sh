@@ -1,10 +1,10 @@
 #!/bin/bash
 
-training_methods=SSL
+training_methods=Dummy
 use_D=False
 use_SB=False
-base_model=GINE
-GPU=7
+base_model=GCN
+GPU=6
 
 python SSL.py \
   --training_methods $training_methods \

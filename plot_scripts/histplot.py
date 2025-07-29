@@ -67,7 +67,6 @@ model_all = (
 )
 
 type_all = ['without D', 'with D'] * 6
-
 error_all = [
     np.std(gp_auc), np.std(gp_d_auc),
     np.std(dt_auc), np.std(dt_d_auc),
@@ -77,37 +76,81 @@ error_all = [
     np.std(gine_auc), np.std(gine_d_auc)
 ]
 
-df = pd.DataFrame({
+df_fig1 = pd.DataFrame({
     "Model": model_all,
     "AUC": auc_all,
     'Class': type_all,
     'Error': error_all
 })
-
-print(df)
-
+print(df_fig1)
 plt.figure(figsize=(8, 5))
 palette = sns.color_palette("Spectral", n_colors=8)
 
-ax = sns.histplot(data=df, x="Model", hue="Class", weights='AUC',
+ax = sns.histplot(data=df_fig1, x="Model", hue="Class", weights='AUC',
                   multiple="dodge", shrink=0.8, discrete=True)
 
-bar_width = 0.8 / 2  # 每组两个 bar: 'with D', 'without D'
-models = df["Model"].unique()
+bar_width = 0.8 / 2
+models = df_fig1["Model"].unique()
 class_order = ['without D', 'with D']
 
 for i, model in enumerate(models):
     for j, cls in enumerate(class_order):
-        subset = df[(df["Model"] == model) & (df["Class"] == cls)]
+        subset = df_fig1[(df_fig1["Model"] == model) & (df_fig1["Class"] == cls)]
         if not subset.empty:
             auc = subset["AUC"].values[0]
             err = subset["Error"].values[0]
             x = i - 0.4 + (j + 0.5) * bar_width  # 柱子的中心位置
             plt.errorbar(x=x, y=auc, yerr=err, fmt='none', ecolor='black', capsize=5, elinewidth=1)
 
-# sns.histplot(data=df, x="Model", hue="Class", weights='AUC', multiple="dodge", shrink=.8)
 plt.title("AUC Score in Different Model after 10-folds Cross Validation")
 plt.grid(axis="y", linestyle="--", alpha=0.8)
 plt.ylabel('AUC Score')
 plt.tight_layout()
 plt.savefig('./figs/histplot.png', dpi=600)
+
+
+
+# auc_all_d_sb = [np.mean(gcn_auc), np.mean(gcn_d_auc), np.mean(gcn_d_sb_auc), np.mean(gine_auc), np.mean(gine_d_auc), np.mean(gine_ssl_d_auc)]
+# model_all_d_sb = (
+#     ["GCN"] * 3 + 
+#     ["GINE"] * 3
+#     # ["GCN_SSL"] * 2 +  
+#     # ["GINE_SSL"] * 2
+# )
+# type_all_d_sb = ['without D', 'with D', 'with SB&D'] * 2
+# error_all_d_sb = [
+#     np.std(gcn_auc), np.std(gcn_d_auc), np.std(gcn_d_sb_auc), 
+#     np.std(gine_auc), np.std(gine_d_auc), np.std(gine_ssl_d_auc)
+# ]
+# df_fig2 = pd.DataFrame({
+#     "Model": model_all_d_sb,
+#     "AUC": auc_all_d_sb,
+#     'Class': type_all_d_sb,
+#     'Error': error_all_d_sb
+# })
+# print(df_fig2)
+
+# plt.figure(figsize=(8, 5))
+# palette = sns.color_palette("Spectral", n_colors=8)
+
+# ax = sns.histplot(data=df_fig2, x="Model", hue="Class", weights='AUC',
+#                   multiple="dodge", shrink=0.8, discrete=True)
+
+# bar_width = 0.9 / 3
+# models = df_fig2["Model"].unique()
+# class_order = ['without D', 'with D', 'with SB&D']
+
+# for i, model in enumerate(models):
+#     for j, cls in enumerate(class_order):
+#         subset = df_fig2[(df_fig2["Model"] == model) & (df_fig2["Class"] == cls)]
+#         if not subset.empty:
+#             auc = subset["AUC"].values[0]
+#             err = subset["Error"].values[0]
+#             x = i - 0.3 + (j) * bar_width  # 柱子的中心位置
+#             plt.errorbar(x=x, y=auc, yerr=err, fmt='none', ecolor='black', capsize=5, elinewidth=1)
+
+# plt.title("AUC Score in Different Model after 10-folds Cross Validation")
+# plt.grid(axis="y", linestyle="--", alpha=0.8)
+# plt.ylabel('AUC Score')
+# plt.tight_layout()
+# plt.savefig('./figs/histplot2.png', dpi=600)
