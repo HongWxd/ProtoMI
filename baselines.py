@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 import argparse
+import torch
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn import tree
@@ -23,11 +24,24 @@ args = parser.parse_args()
 with open('./data/baseline_data.pkl', 'rb') as f:
     all_data = pickle.load(f)
 
+# load the graph data and descriptors data
+with open('./data/norm_normal.pkl', 'rb') as f:
+    desp_data = pickle.load(f)
+
+merged_data = []
+desp_data = torch.tensor(desp_data, dtype=torch.float)
+for desp, graph in zip(tqdm(desp_data, desc='Loading training data...'), all_data):
+    graph.descriptors = desp.unsqueeze(0)
+    merged_data.append(graph)
+all_data = merged_data
+
 smiles = []
 label = []
+desp = []
 for data in all_data:
     smiles.append(data.smile)
     label.append(data.y)
+    desp.append(data.descriptors)
 
 # create a list of mols
 none_smiles = []
@@ -50,20 +64,29 @@ for smile in new_smiles:
  
 # create a list of fingerprints from mols
 X = [Chem.RDKFingerprint(mol) for mol in tqdm(mols)]
+use_D = True
+if use_D:
+    new_X = []
+    for fp, descriptor in zip(X, desp):
+        descriptor = descriptor.squeeze(0).tolist()
+        X = np.array(list(fp) + descriptor)
+        new_X.append(X)
+else:
+    new_X = X
 
 best_fold = 0
 all_metrics = []
 kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
-for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
+for fold, (train_idx, test_idx) in enumerate(kf.split(new_X)):
     print(f'\n===== Fold {fold+1} =====')
-    X_train, y_train = [X[i] for i in train_idx], [y[i] for i in train_idx]
-    X_test, y_test = [X[i] for i in test_idx], [y[i] for i in test_idx]
+    X_train, y_train = [new_X[i] for i in train_idx], [y[i] for i in train_idx]
+    X_test, y_test = [new_X[i] for i in test_idx], [y[i] for i in test_idx]
     scaler = StandardScaler()
 
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    args.model = 'SVM'
+    args.model = 'GP'
     if args.model == 'SVM':
         model = SVC(kernel='rbf', C=1.0, gamma='scale', probability=True)
     elif args.model == 'RF':
@@ -107,4 +130,4 @@ print(f"Mean F1: {mean_metrics[3]:.4f} ± {std_metrics[3]:4f}")
 print(f'Best fold: {best_fold+1}')
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/plot_data/{args.model}_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/violin_data/{args.model}_D_{use_D}_data.csv', index=False)

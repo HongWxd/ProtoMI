@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 from torch_geometric.loader import DataLoader
-from model import GCN, GINE, GINE_descriptor
+from model import GCN, GINE, GINE_descriptor, GCN_with_descriptor
 from tqdm import tqdm
 import time
 import pickle
@@ -13,6 +13,16 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 import warnings
 
 warnings.filterwarnings('ignore')
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
@@ -26,7 +36,7 @@ parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout
 parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
 parser.add_argument('--repeats', type=int, default=5, help='Repeat number of cross validation')
 parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
-parser.add_argument('--training_methods', type=str, default='Self_Training', help='Training methods')
+parser.add_argument('--training_methods', type=str, default='Dummy', help='Training methods')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=40, help='Self training warm up epoch period')
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
@@ -34,9 +44,13 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 parser.add_argument('--d_keys', type=int, default=128, help='Number of descriptors')
 parser.add_argument('--d_values', type=int, default=128, help='Number of descriptors')
+parser.add_argument('--use_D', type=str2bool, default=True, help='whether use descriptors or not')
+parser.add_argument('--use_SB', type=str2bool, default=True, help='whether use sample balancer or not')
+parser.add_argument('--base_model', type=str, default='GINE', help='base GNN model')
+parser.add_argument('--GPU', type=int, default=6, help='GPU number')
 
 args = parser.parse_args()
-device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+device = torch.device(f'cuda:{args.GPU}' if torch.cuda.is_available() else 'cpu')
 
 def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
     labeled_train_data = [i for i in train_data if i.mask == True]
@@ -62,7 +76,7 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
         iter_loss = loss / int(data.mask.sum())
         print(f'\t  Iteras: {i+1} | Loss: {iter_loss:.7f}')
     
-    if args.training_methods == 'Self_Training':
+    if args.training_methods == 'SSL':
         if epoch >= args.warm_up_epoch:# Warm up for several epoches
             if total_masked <= pseudo_thr*2:# Control the pseudo samples 
                 labeled_train_data = self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args)
@@ -154,9 +168,26 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
-            hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+    # select the model for SSL
+    if args.base_model == 'GCN':
+        print(args.use_D, args.base_model, args.use_SB, args.training_methods)
+        if args.use_D:
+            model = GCN_with_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+                hidden_channels=args.hidden_channels,
+                num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+        else:
+            model = GCN(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+                hidden_channels=args.hidden_channels,
+                num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+    elif args.base_model == 'GINE':
+        if args.use_D:
+            model = GINE_descriptor(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+                    hidden_channels=args.hidden_channels,
+                    num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+        else:
+            model = GINE(num_node_features=train_data[0].n_node_features, num_edge_features=train_data[0].n_edge_features, 
+                    hidden_channels=args.hidden_channels,
+                    num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
     print(model)
 
@@ -239,7 +270,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(all_data)):
 
     best_metrics = (best_test_auc, best_test_precision, best_test_recall, best_test_f1)
     all_metrics.append(best_metrics)
-    plot_train_results(pratical_epoch, total_loss, total_test_loss, total_test_auc, fold)# plot loss and acc figure
+    # plot_train_results(pratical_epoch, total_loss, total_test_loss, total_test_auc, fold)# plot loss and acc figure
 
 all_metrics = np.array(all_metrics)
 mean_metrics = all_metrics.mean(axis=0)
@@ -261,7 +292,7 @@ print(f'Best fold: {best_fold}')
 
 model_df = pd.DataFrame(all_metrics)
 model_df.columns = ['AUC', 'Precision', 'Recall', 'F1']
-model_df.to_csv(f'./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv', index=False)
+model_df.to_csv(f'./plot_scripts/violin_data/{args.base_model}_{args.training_methods}_D_{args.use_D}_SB_{args.use_SB}_data.csv', index=False)
 
 if best_model_state_dict is not None:
-    torch.save(best_model_state_dict, './checkpoints/best_model.pth')
+    torch.save(best_model_state_dict, f'./checkpoints/{args.base_model}_{args.training_methods}_D_{args.use_D}_SB_{args.use_SB}_model.pth')

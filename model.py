@@ -26,6 +26,40 @@ class GCN(torch.nn.Module):
         x = self.lin(x)
         return x
 
+class GCN_with_descriptor(torch.nn.Module):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
+        super(GCN_with_descriptor, self).__init__()
+        self.conv1 = GCNConv(num_node_features, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        
+        self.dan1 = DAN(hidden_channels, args.num_heads, args.desp_dim, args.d_ff, dropout, args.d_keys, args.d_values)
+
+        self.lin1 = Linear(hidden_channels, hidden_channels)
+        self.lin2 = Linear(hidden_channels, num_classes)
+        self.dropout = Dropout(dropout)
+
+    def forward(self, x, edge_index, edge_attr, batch, descriptors):
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv2(x, edge_index)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = global_mean_pool(x, batch)
+
+        x = self.dan1(x, descriptors)
+        # desp_out, _ = self.multihead_attn(desp_embed, x_in, x_in) # [B, N, H]
+        x = x.squeeze(1)
+
+        x = self.lin1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+        x = self.lin2(x)
+
+        return x
+
 class GINE(torch.nn.Module):
     def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
         super(GINE, self).__init__()

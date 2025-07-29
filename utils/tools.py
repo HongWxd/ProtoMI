@@ -210,7 +210,7 @@ def self_training(model, labeled_train_data, unlabeled_train_data, device, pseud
                 
                 update_list = data[high_conf_mask]
                 confs_list = confs[high_conf_mask]
-                if args.training_methods == 'Self_Training':
+                if args.use_SB == 'Sample_Balance':
                     pos_sample = 0
                     neg_sample = 0
                     for data in labeled_train_data:
