@@ -93,6 +93,9 @@ def train(model, train_data, device, optimizer, epoch, pseudo_thr, args):
         early_stop_flag = 0
     else:
         early_stop_flag = 1
+    
+    if args.training_methods != 'SSL':
+        early_stop_flag = 1
 
     labeled_train_cid_list = [i.cid for i in labeled_train_data]
     unlabeled_train_data = [i for i in train_data if i.cid not in labeled_train_cid_list]

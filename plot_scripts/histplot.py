@@ -20,14 +20,20 @@ SVM_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/SVM_D_True_dat
 
 GCN_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_Dummy_D_False_SB_False_data.csv'))
 GCN_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_Dummy_D_True_SB_False_data.csv'))
-GCN_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_Dummy_D_True_SB_True_data.csv'))
+
+GCN_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_False_SB_False_data.csv'))
+GCN_SSL_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_True_SB_False_data.csv'))
+# GCN_SSL_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_True_SB_True_data.csv'))
 
 GINE_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_Dummy_D_False_SB_False_data.csv'))
 GINE_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_Dummy_D_True_SB_False_data.csv'))
-GINE_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_Dummy_D_True_SB_True_data.csv'))
 
-GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_data.csv'))
-GINE_SSL_desp_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv'))
+GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_D_False_SB_False_data.csv'))
+GINE_SSL_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_D_True_SB_False_data.csv'))
+GINE_SSL_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv'))
+
+# GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_data.csv'))
+# GINE_SSL_desp_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv'))
 
 gp_auc = GP_data['AUC'].values.tolist()
 gp_d_auc = GP_D_data['AUC'].values.tolist()
@@ -43,17 +49,20 @@ svm_d_auc = SVM_D_data['AUC'].values.tolist()
 
 gcn_auc = GCN_data['AUC'].values.tolist()
 gcn_d_auc = GCN_D_data['AUC'].values.tolist()
-gcn_d_sb_auc = GCN_D_SB_data['AUC'].values.tolist()
+
+gcn_ssl_auc = GCN_SSL_data['AUC'].values.tolist()
+gcn_ssl_d_auc = GCN_SSL_D_data['AUC'].values.tolist()
+# gcn_ssl_d_sb_auc = GCN_SSL_D_SB_data['AUC'].values.tolist()
 
 gine_auc = GINE_data['AUC'].values.tolist()
 gine_d_auc = GINE_D_data['AUC'].values.tolist()
-gine_d_sb_auc = GINE_D_SB_data['AUC'].values.tolist()
 
 gine_ssl_auc = GINE_SSL_data['AUC'].values.tolist()
-gine_ssl_d_auc = GINE_SSL_desp_data['AUC'].values.tolist()
+gine_ssl_d_auc = GINE_SSL_D_data['AUC'].values.tolist()
+gine_ssl_d_sb_auc = GINE_SSL_D_SB_data['AUC'].values.tolist()
 
 auc_all = [np.mean(gp_auc), np.mean(gp_d_auc), np.mean(dt_auc), np.mean(dt_d_auc), np.mean(rf_auc), np.mean(rf_d_auc), np.mean(svm_auc), np.mean(svm_d_auc), 
-           np.mean(gcn_auc), np.mean(gcn_d_auc), np.mean(gine_auc), np.mean(gine_d_auc)]
+           np.mean(gcn_auc), np.mean(gcn_d_auc), np.mean(gine_auc), np.mean(gine_d_auc), np.mean(gcn_ssl_auc), np.mean(gcn_ssl_d_auc)]
 
 model_all = (
     ["GP"] * 2 +
@@ -61,19 +70,20 @@ model_all = (
     ["RF"] * 2 +
     ['SVM'] * 2 + 
     ["GCN"] * 2 + 
-    ["GINE"] * 2
-    # ["GCN_SSL"] * 2 +  
+    ["GINE"] * 2 + 
+    ["GCN_SSL"] * 2 
     # ["GINE_SSL"] * 2
 )
 
-type_all = ['without D', 'with D'] * 6
+type_all = ['without D', 'with D'] * 7
 error_all = [
     np.std(gp_auc), np.std(gp_d_auc),
     np.std(dt_auc), np.std(dt_d_auc),
     np.std(rf_auc), np.std(rf_d_auc),
     np.std(svm_auc), np.std(svm_d_auc),
     np.std(gcn_auc), np.std(gcn_d_auc),
-    np.std(gine_auc), np.std(gine_d_auc)
+    np.std(gine_auc), np.std(gine_d_auc), 
+    np.std(gcn_ssl_auc), np.std(gcn_ssl_d_auc), 
 ]
 
 df_fig1 = pd.DataFrame({

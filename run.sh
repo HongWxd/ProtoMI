@@ -1,8 +1,8 @@
 #!/bin/bash
 
-training_methods=Dummy
-use_D=False
-use_SB=False
+training_methods=SSL
+use_D=True
+use_SB=True
 base_model=GCN
 GPU=6
 

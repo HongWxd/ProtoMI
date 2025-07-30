@@ -236,7 +236,7 @@ model.eval()
 fixed_graph = all_data[0]  
 descriptors_variants = desp_data[:100]  
 background_inputs = descriptors_variants.cpu().numpy()  
-test_inputs = desp_data[100:150].cpu().numpy()  
+test_inputs = desp_data[100:250].cpu().numpy()  
 explainer = shap.KernelExplainer(model_predict, background_inputs)
 shap_values = explainer.shap_values(test_inputs)
 shap_vals_for_class1 = shap_values[:, :, 1]
