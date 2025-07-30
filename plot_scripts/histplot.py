@@ -23,13 +23,15 @@ GCN_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_Dummy_D_Tr
 
 GCN_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_False_SB_False_data.csv'))
 GCN_SSL_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_True_SB_False_data.csv'))
-# GCN_SSL_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_True_SB_True_data.csv'))
+GCN_SSL_no_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_False_SB_True_data.csv'))
+GCN_SSL_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GCN_SSL_D_True_SB_True_data.csv'))
 
 GINE_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_Dummy_D_False_SB_False_data.csv'))
 GINE_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_Dummy_D_True_SB_False_data.csv'))
 
 GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_D_False_SB_False_data.csv'))
 GINE_SSL_D_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_D_True_SB_False_data.csv'))
+# GINE_SSL_no_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_D_False_SB_True_data.csv'))
 GINE_SSL_D_SB_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_descriptor_data.csv'))
 
 # GINE_SSL_data = pd.DataFrame(pd.read_csv('./plot_scripts/violin_data/GINE_SSL_data.csv'))
@@ -52,7 +54,8 @@ gcn_d_auc = GCN_D_data['AUC'].values.tolist()
 
 gcn_ssl_auc = GCN_SSL_data['AUC'].values.tolist()
 gcn_ssl_d_auc = GCN_SSL_D_data['AUC'].values.tolist()
-# gcn_ssl_d_sb_auc = GCN_SSL_D_SB_data['AUC'].values.tolist()
+gcn_ssl_no_d_sb_auc = GCN_SSL_no_D_SB_data['AUC'].values.tolist()
+gcn_ssl_d_sb_auc = GCN_SSL_D_SB_data['AUC'].values.tolist()
 
 gine_auc = GINE_data['AUC'].values.tolist()
 gine_d_auc = GINE_D_data['AUC'].values.tolist()
@@ -62,7 +65,8 @@ gine_ssl_d_auc = GINE_SSL_D_data['AUC'].values.tolist()
 gine_ssl_d_sb_auc = GINE_SSL_D_SB_data['AUC'].values.tolist()
 
 auc_all = [np.mean(gp_auc), np.mean(gp_d_auc), np.mean(dt_auc), np.mean(dt_d_auc), np.mean(rf_auc), np.mean(rf_d_auc), np.mean(svm_auc), np.mean(svm_d_auc), 
-           np.mean(gcn_auc), np.mean(gcn_d_auc), np.mean(gine_auc), np.mean(gine_d_auc), np.mean(gcn_ssl_auc), np.mean(gcn_ssl_d_auc)]
+           np.mean(gcn_auc), np.mean(gcn_d_auc), np.mean(gine_auc), np.mean(gine_d_auc), np.mean(gcn_ssl_auc), np.mean(gcn_ssl_d_auc), 
+           np.mean(gine_ssl_auc), np.mean(gine_ssl_d_auc)]
 
 model_all = (
     ["GP"] * 2 +
@@ -71,11 +75,11 @@ model_all = (
     ['SVM'] * 2 + 
     ["GCN"] * 2 + 
     ["GINE"] * 2 + 
-    ["GCN_SSL"] * 2 
-    # ["GINE_SSL"] * 2
+    ["GCN_SSL"] * 2 +
+    ["GINE_SSL"] * 2
 )
 
-type_all = ['without D', 'with D'] * 7
+type_all = ['without D', 'with D'] * 8
 error_all = [
     np.std(gp_auc), np.std(gp_d_auc),
     np.std(dt_auc), np.std(dt_d_auc),
@@ -84,6 +88,7 @@ error_all = [
     np.std(gcn_auc), np.std(gcn_d_auc),
     np.std(gine_auc), np.std(gine_d_auc), 
     np.std(gcn_ssl_auc), np.std(gcn_ssl_d_auc), 
+    np.std(gine_ssl_auc), np.std(gine_ssl_d_auc), 
 ]
 
 df_fig1 = pd.DataFrame({
@@ -120,17 +125,15 @@ plt.savefig('./figs/histplot.png', dpi=600)
 
 
 
-# auc_all_d_sb = [np.mean(gcn_auc), np.mean(gcn_d_auc), np.mean(gcn_d_sb_auc), np.mean(gine_auc), np.mean(gine_d_auc), np.mean(gine_ssl_d_auc)]
+# auc_all_d_sb = [np.mean(gcn_ssl_auc), np.mean(gcn_ssl_d_auc), np.mean(gcn_ssl_no_d_sb_auc), np.mean(gcn_ssl_d_sb_auc)]
+#                 # np.mean(gine_ssl_auc), np.mean(gine_ssl_d_auc), np.mean(gine_ssl_no_d_sb_auc), np.mean(gine_ssl_d_sb_auc)]
 # model_all_d_sb = (
-#     ["GCN"] * 3 + 
-#     ["GINE"] * 3
-#     # ["GCN_SSL"] * 2 +  
-#     # ["GINE_SSL"] * 2
+#     ["GCN_SSL"] * 4
+#     # ["GINE_SSL"] * 4
 # )
-# type_all_d_sb = ['without D', 'with D', 'with SB&D'] * 2
+# type_all_d_sb = ['D-, SB-', 'D+, SB-', 'D-, SB+', 'D+, SB+']
 # error_all_d_sb = [
-#     np.std(gcn_auc), np.std(gcn_d_auc), np.std(gcn_d_sb_auc), 
-#     np.std(gine_auc), np.std(gine_d_auc), np.std(gine_ssl_d_auc)
+#     np.std(gcn_ssl_auc), np.std(gcn_ssl_d_auc), np.std(gcn_ssl_no_d_sb_auc), np.std(gcn_ssl_d_sb_auc)
 # ]
 # df_fig2 = pd.DataFrame({
 #     "Model": model_all_d_sb,
@@ -146,7 +149,7 @@ plt.savefig('./figs/histplot.png', dpi=600)
 # ax = sns.histplot(data=df_fig2, x="Model", hue="Class", weights='AUC',
 #                   multiple="dodge", shrink=0.8, discrete=True)
 
-# bar_width = 0.9 / 3
+# bar_width = 0.8 / 4
 # models = df_fig2["Model"].unique()
 # class_order = ['without D', 'with D', 'with SB&D']
 

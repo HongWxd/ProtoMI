@@ -2,9 +2,9 @@
 
 training_methods=SSL
 use_D=True
-use_SB=True
-base_model=GCN
-GPU=6
+use_SB=False
+base_model=GINE
+GPU=7
 
 python SSL.py \
   --training_methods $training_methods \
