@@ -2,7 +2,7 @@
 
 training_methods=SSL
 use_D=True
-use_SB=False
+use_SB=True
 base_model=GINE
 GPU=7
 
