@@ -7090,5 +7090,17 @@
         "electrolyte": "1.0M LiPF6 in EC/DEC/EMC (3:2:5, in weight)",
         "additive": "Succinic Anhydride (SA) and 3-(trimethylsilyl)phenylboronic acid (TMSPB)",
         "year": "2024"
+    },
+    "10.1016_j.est.2025.115596": {
+        "title": "10.1016_j.est.2025.115596",
+        "relevant": "Yes",
+        "electrolyte_type": "Liquid",
+        "battery_system": "Lithium metal battery",
+        "format": "Coin",
+        "cathode_material": "NCM811",
+        "anode_material": "Lithium metal",
+        "electrolyte": "1 M LiPF6 in EC:DEC (1:1, v:v)",
+        "additive": "Bis(pinacolato)diboron (BDB)",
+        "year": "2025"
     }
 }
