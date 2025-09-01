@@ -6,7 +6,7 @@ import numpy as np
 
 
 # 输入DOI列表
-battery_AI_df = pd.read_csv('./boron_electrolyte_batteries_AI.csv')
+battery_AI_df = pd.read_csv('./V3/boron_electrolyte_batteries_AI.csv')
 dois = battery_AI_df['DOI'].tolist()
 
 def download_paper(doi, path):
