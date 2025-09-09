@@ -50,10 +50,10 @@ def summarize_by_AI(text):
     return labeled_answer
 
 
-path = './V3/boron_electrolyte_batteries_AI.csv'
+path = './V3/DOIs.csv'
 data_df = pd.DataFrame(pd.read_csv(path))
 
-with open('./V3/papers_label_test.json', "r") as f:
+with open('./V3/papers_label.json', "r") as f:
     label_data = json.load(f)
 
 titles = []
@@ -80,6 +80,7 @@ for key, value in label_data.items():
     additives.append(value['additive'])
     if value['year'] == 'Not found':
         years.append(0)
+    
     else:
         years.append(int(value['year']))
     formats.append(value['format'])

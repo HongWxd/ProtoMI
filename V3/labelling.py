@@ -258,8 +258,8 @@ def second_round_check():
     check_df.to_csv('./V3/check_data_V2.csv', index=False)
 
 
-first_round_label()
-# second_round_check()
+# first_round_label()
+second_round_check()
 
 # V2_df = pd.DataFrame(pd.read_csv('./V3/check_data_V2.csv'))
 # boron_additive_name = V2_df['boron_additive_full_name'].to_list()
