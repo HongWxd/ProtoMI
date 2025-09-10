@@ -17,6 +17,7 @@ for additives in boron_additive:
 
 top_num = 15
 counter = Counter(total_list)
+print(counter)
 top = counter.most_common(top_num)
 labels, values = zip(*top)
 
