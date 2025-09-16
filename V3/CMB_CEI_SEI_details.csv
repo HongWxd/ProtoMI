@@ -1,0 +1,3 @@
+idx,additive,CEI,High_voltage_performance_CEI,SEI,Optimal_operating_temperature
+547,THFB,Not found,Not found,"The boron-containing additive THFB participates in electro-reduction, forming CaI2/borides hybrid SEIs with enhanced Ca2+ conductivity, suppressing side reactions and reducing interface impedance.",Not found
+681,"BF₃·DE, BF₃ complexes",Not found,Not found,"The boron-containing additive BF₃·DE forms a boron-cross-linked polymeric matrix in the SEI, which allows for Ca²⁺ migration and favors calcium plating and stripping. It includes BO₃ groups, CaF₂, and TFSI decomposition products, with higher boron content at lower potentials promoting better performance.",100°C (used for polarization and electrochemical measurements in the study)

@@ -12,9 +12,7 @@ path = './V3/check_data_V2.csv'
 data_df = pd.DataFrame(pd.read_csv(path))
 additive_df = data_df[data_df['appropriate'] == 'Yes']
 cell_types = additive_df['format'].tolist()
-cell_types = [i for i in cell_types if i != 'Not found']
 cell_systems = additive_df['battery_system'].tolist()
-cell_systems = [i for i in cell_systems if i != 'Not found']
 
 cell_type_list = []
 for type in cell_types:
@@ -24,6 +22,8 @@ for type in cell_types:
         cell_type_list.append('Swagelok Type')
     elif 'Pellet' in type or 'pellet' in type:
         cell_type_list.append('Pellet Type')
+    elif 'Not found' in type:
+        cell_type_list.append('Other')
     else:
         type = type.split(' (')[0]
         cell_type_list.append(type)
@@ -36,6 +36,8 @@ cell_sys_list = []
 for type in cell_systems:
     if type.startswith('Li-ion') or 'Li-ion' in type:
         cell_sys_list.append('Li-ion')
+    elif 'Not found' in type:
+        cell_sys_list.append('Other')
     elif type.startswith('Li mental') or 'Li mental' in type or 'Metallic lithium' in type or 'lithium-ion' in type or 'Lithium metal' in type or 'Li-metal' in type or 'lithium metal' in type or 'Li metal' in type or 'lithium-metal' in type or 'Lithium' in type:
         cell_sys_list.append('Li mental')
     elif 'Sodium-ion' in type or 'sodium' in type or 'Na-based dual-ion' in type:
@@ -62,12 +64,12 @@ cell_sys_df = pd.DataFrame()
 cell_sys_df['cell_sys'] = cell_sys_list
 
 
-plt.figure(figsize=(6,4))
-sns.histplot(data=cell_type_df, x="cell_type", discrete=True)
-plt.xticks(rotation=45, ha='right')
-plt.tight_layout()  
-plt.savefig('./V3/cell_type_distribution.png', dpi=600)
-plt.clf()
+# plt.figure(figsize=(6,4))
+# sns.histplot(data=cell_type_df, x="cell_type", discrete=True)
+# plt.xticks(rotation=45, ha='right')
+# plt.tight_layout()  
+# plt.savefig('./V3/cell_type_distribution.png', dpi=600)
+# plt.clf()
 
 
 plt.figure(figsize=(6,4))

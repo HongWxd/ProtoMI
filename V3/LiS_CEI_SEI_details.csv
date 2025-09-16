@@ -1,0 +1,7 @@
+idx,additive,CEI,High_voltage_performance_CEI,SEI,Optimal_operating_temperature
+207,LiFPB,Not found,Not found,"The LiFPB-containing electrolyte facilitates the formation of a robust SEI enriched with LiF and LiBxOy species, which suppresses side reactions, reduces interface impedance, and enhances cycling stability.",Not found
+214,BN,Not found,Not found,Not found,70°C
+304,BN,Not found,Not found,Not found,Not found
+358,LiDFOB,Not found,Not found,"The SEI composition on cycled Li anodes is completely identical after the first discharge, suggesting that the side reactions on Li anode showing minor relationship with the unusual cycling performance of LiDFOB based battery.",Not found
+488,LiBF4,"The sparingly dissolved LiPS can react with the LiBF4 additive to induce in-situ formation of homogenous interphase on the cathode surface, constructing an ion transport highway and promoting electrolyte wetting/penetration.",Not found,"The LAA-0.05 electrolyte induces the formation of a robust, F-rich SEI on the Li metal anode, suppressing side reactions and reducing interface impedance, leading to improved Li stripping/plating stability and coulombic efficiency.",Not found
+679,TMSB,"The TMSB additive promotes the formation of a stable and thin CEI film by adsorbing F- and PFx- to form polyanionic groups, which suppresses the formation of insulating LiF, enhances conductivity, and reduces interface impedance.",Not found,Not found,Not found
