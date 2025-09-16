@@ -9,7 +9,7 @@ from collections import Counter
 import re
 import PyPDF2
 
-path = './V3/check_data_V2.csv'
+path = './V3/processed_data/check_data_V2.csv'
 data_df = pd.DataFrame(pd.read_csv(path))
 additive_df = data_df[data_df['appropriate'] == 'Yes']
 cell_systems = additive_df['battery_system'].tolist()
@@ -65,11 +65,12 @@ cell_sys_df['cell_sys'] = cell_sys_list
 def CEI_SEI_details(papers_idx_list, system_type):
     paper_path = '/data/hwx/boron/boron_electrolyte_batteries/papers'
     for idx in tqdm(papers_idx_list, desc=f'Processing {system_type} papers'):
-        details_df = pd.DataFrame(pd.read_csv(f'./V3/{system_type}_CEI_SEI_details.csv'))
+        details_df = pd.DataFrame(pd.read_csv(f'./V3/CEI_SEI_details/{system_type}_CEI_SEI_details.csv'))
         labeled_idx = details_df['idx'].tolist()
 
         additive = data_df.loc[data_df['idx'] == idx, 'boron_additive_abbr_name'].values[0]
         if additive == 'Not found':
+            print(f'Paper {idx} additive not found, skip')
             continue
         if idx in labeled_idx:
             continue
@@ -148,7 +149,7 @@ def CEI_SEI_details(papers_idx_list, system_type):
 
         add_df = pd.DataFrame([answer])
         df_new = pd.concat([details_df, add_df], axis=0, ignore_index=True)
-        df_new.to_csv(f'./V3/{system_type}_CEI_SEI_details.csv', index=False)
+        df_new.to_csv(f'./V3/CEI_SEI_details/{system_type}_CEI_SEI_details.csv', index=False)
 
     # save_df = pd.DataFrame()
     # save_df = pd.DataFrame(chat_answers)
