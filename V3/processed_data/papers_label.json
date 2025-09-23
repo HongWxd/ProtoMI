@@ -10750,5 +10750,17 @@
         "electrolyte": "1 mol L⁻¹ lithium bis(trifluoromethanesulfonyl)imide (LiTFSI) dissolved in a mixture of 1,2-dimethoxyethane (DME)/1,3-dioxolane (DOL) (v/v = 1:1)",
         "additive": "Not found",
         "year": "2022"
+    },
+    "10.1038_s41560-025-01838-1": {
+        "title": "10.1038_s41560-025-01838-1",
+        "relevant": "Yes",
+        "electrolyte_type": "Liquid",
+        "battery_system": "Lithium metal batteries",
+        "format": "Coin and Pouch",
+        "cathode_material": "NCM811",
+        "anode_material": "Lithium metal",
+        "electrolyte": "Various, including 1.2 M LiTFSI in THP:FEC (6:4 by volume) and others with different salts",
+        "additive": "Lithium Difluoro(oxalato)borate (LiDFOB), Lithium tetrafluoroborate (LiBF4), Lithium bis(fluorosulfonyl)imide (LiFSI), Lithium hexafluorophosphate (LiPF6), Lithium hexafluoroarsenate (LiAsF6), and Lithium tetraphenylborate (LiBPh4)",
+        "year": "2025"
     }
 }

@@ -14,6 +14,7 @@ data_df = pd.DataFrame(pd.read_csv(path))
 additive_df = data_df[data_df['appropriate'] == 'Yes']
 cell_systems = additive_df['battery_system'].tolist()
 idx = additive_df['idx'].tolist()
+print(additive_df)
 
 cell_sys_list = []
 LIB_idx = []
@@ -61,6 +62,7 @@ for index, type in zip(idx, cell_systems):
 
 cell_sys_df = pd.DataFrame()
 cell_sys_df['cell_sys'] = cell_sys_list
+print(cell_sys_df)
 
 def CEI_SEI_details(papers_idx_list, system_type):
     paper_path = '/data/hwx/boron/boron_electrolyte_batteries/papers'
@@ -156,10 +158,10 @@ def CEI_SEI_details(papers_idx_list, system_type):
     # save_df.to_csv(f'./V3/{system_type}_CEI_SEI_details.csv', index=False)
   
 CEI_SEI_details(LIB_idx, 'LIB')
-CEI_SEI_details(LMB_idx, 'LMB')
-CEI_SEI_details(SIB_idx, 'SIB')
-CEI_SEI_details(SMB_idx, 'SMB')
-CEI_SEI_details(LiS_idx, 'LiS')
-CEI_SEI_details(MIB_idx, 'MIB')
-CEI_SEI_details(CMB_idx, 'CMB')
-CEI_SEI_details(ZIB_idx, 'ZIB')
+# CEI_SEI_details(LMB_idx, 'LMB')
+# CEI_SEI_details(SIB_idx, 'SIB')
+# CEI_SEI_details(SMB_idx, 'SMB')
+# CEI_SEI_details(LiS_idx, 'LiS')
+# CEI_SEI_details(MIB_idx, 'MIB')
+# CEI_SEI_details(CMB_idx, 'CMB')
+# CEI_SEI_details(ZIB_idx, 'ZIB')

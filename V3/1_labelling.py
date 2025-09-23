@@ -16,6 +16,7 @@ def label_by_AI(title, text):
     Suppose you are an expert in the field of batteries, here is the paper called title1, please help me to find the following information:
     [text...]
     
+    Please think step by step and answer the following questions.
     Question:
     1. Is the additive(s) proposed by this paper added to the battery electrolyte? Yes.
     2. What is the type of the battery electrolyte proposed by this paper? Liquid.
@@ -27,7 +28,8 @@ def label_by_AI(title, text):
     7. What is the additive proposed by this paper, find it in the paper, including full term and abbreviation of additives? Lithium Difluoro(oxalato)borate (LiDFOB).
     8. What is the year of publication of this paper? 2020.
 
-    [Note] 
+    [Note]
+
     If the information is not found in the text, please answer 'Not found'.
 
     EXAMPLE JSON OUTPUT:
@@ -72,6 +74,7 @@ def check_by_AI(doi, electrolyte, additive):
     Suppose you are an expert in the field of batteries, here is the electrolyte and additive information, please help me to find the following information:
     electrolyte: [...], additive: [...]
     
+    Please think step by step and answer the following questions.
     Quenstions:
     1. Whether the additives used in the electrolyte are appropriate for the battery's electrolyte requirements? Yes.
     2. If this electrolyte additive is not a reasonable one, please tell me why. [Reason...]
@@ -118,7 +121,7 @@ def check_by_AI(doi, electrolyte, additive):
 
 def first_round_label():
     path = '/data/hwx/boron/boron_electrolyte_batteries/papers'
-    json_path = './V3/papers_label.json'
+    json_path = './V3/processed_data/papers_label.json'
     paper_path = os.listdir(path)
     papers = [i for i in paper_path if i.endswith('.pdf')]
 
@@ -144,16 +147,16 @@ def first_round_label():
             continue
 
         labeled_answer = label_by_AI(paper, full_text)
-        data[f"{labeled_answer['title']}"] = labeled_answer
+        data[paper] = labeled_answer
 
         with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=4)
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
 def second_round_check():
-    path = './V3/DOIs.csv'
+    path = './V3/raw_data/DOIs.csv'
     data_df = pd.DataFrame(pd.read_csv(path))
 
-    with open('./V3/papers_label.json', "r") as f:
+    with open('./V3/processed_data/papers_label.json', "r") as f:
         label_data = json.load(f)
 
     titles = []
@@ -221,7 +224,7 @@ def second_round_check():
     check_doi_list = []
     idx_list = []
     abstract_list = []
-    abs_df = pd.DataFrame(pd.read_csv('./V3/boron electrolyte batteries.csv'))
+    abs_df = pd.DataFrame(pd.read_csv('./V3/raw_data/boron electrolyte batteries.csv'))
     for idx, (doi, electrolyte, additive) in enumerate(zip(tqdm(doi_list), electrolyte_list, additives_list)):
         check_answer = check_by_AI(doi, electrolyte, additive)
         abs = abs_df.loc[abs_df['DOI'] == doi, 'Abstract'].values
@@ -258,7 +261,7 @@ def second_round_check():
     check_df.to_csv('./V3/check_data_V2.csv', index=False)
 
 
-# first_round_label()
+first_round_label()
 second_round_check()
 
 # V2_df = pd.DataFrame(pd.read_csv('./V3/check_data_V2.csv'))
