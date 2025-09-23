@@ -2,22 +2,21 @@ import pandas as pd
 from collections import Counter
 import matplotlib.pyplot as plt
 
-data_df = pd.DataFrame(pd.read_csv('./V3/check_data_V2.csv'))
-boron_additive = data_df['boron_additive_abbr_name'].tolist()
-total_list = []
-for additives in boron_additive:
-    if additives == 'Not found' or additives == 'Not specified in input, but examples are (C6H3F)O2B(C6H3F2), (C6F4)O2B(C6F5)':
-        continue
-    
-    additive_list = additives.split(',')
-    if len(additive_list) > 1:
-        total_list += additive_list
-    else:
-        total_list.append(additives)
+additive_df = pd.DataFrame(pd.read_csv('./V3/processed_data/additives_order.csv'))
+additives = additive_df['additives'].tolist()
 
-top_num = 15
-counter = Counter(total_list)
-print(counter)
+top_num = 21
+counter = Counter(additives)
+
+new_counter = {}
+for k, v in counter.items():
+    if 'BN' in k:
+        continue
+    else:
+        new_counter[k] = v
+
+
+counter = Counter(new_counter)
 top = counter.most_common(top_num)
 labels, values = zip(*top)
 
@@ -35,7 +34,4 @@ plt.xlabel("Additives Name")
 plt.ylabel("Reported Time")
 plt.title(f"The top {top_num} most frequently occurring elements")
 plt.tight_layout()
-plt.savefig('./V3/additive_count.png', dpi=600)
-
-print(len(total_list))
-print(len(set(total_list)))
+plt.savefig('./V3/plots/additive_count.png', dpi=600)

@@ -18,6 +18,7 @@ for additive_abbr, additive in zip(additives_abbr, additives):
     else:
         total_additives_abbr.append(additive_abbr)
 
+total_additives_abbr = list(set(total_additives_abbr))
 
 additive_abbr_single = []
 idx_each_additive = []
@@ -51,6 +52,7 @@ reunify_df['electrolytes'] = electrolytes_info
 reunify_df['cathodes'] = cathode_info
 reunify_df['anodes'] = anode_indo
 reunify_df['types'] = cell_type_info
+print(reunify_df)
 reunify_df.to_csv('./V3/processed_data/additives_order.csv', index=False)
 
         
