@@ -50,7 +50,7 @@ def chemspider(name):
 
 
 # 示例
-name = "triol borate"
+name = "5,5,5',5'-tetramethyl-2,2'-bi-1,3,2-dioxaborinane"
 print("PubChem:", PUBCHEM(name))
 print("OPSIN:", OPSIN(name))
 print("chemspider:", chemspider(name))
