@@ -163,61 +163,61 @@ for k, v in hybridization_dict.items():
 print(len(new_dict))
 
 # # electrolyte type vs year
-# year_electrolyte_type_pair = {}
-# for additive, values in additive_smiles_pair.items():
-#     if additive in ['(C6H3F)O2B(C6H3F2)', '(C6H3F)O2B(C7H4F3)', '(C6H3F)O2B(C8H3F6)', '(C6F4)O2B(C6H4F)', '(C6F4)O2B(C6H3F2)', '(C6F4)O2B(C6F5)', '(C6F4)O2B(C7H3F6)', '(C6F4)O2B(C8H3F6)', '(C6F12)O2B(C6H5)', '(C6F12)O2B(C6H3F2)', '(C6F12)O2B(C6F5)', '(C3HF6O)2B(C6H5)', '(C3HF6O)2B(C6H3F2)', '(C3HF6O)2B(C6F5)']:
-#         select_df = additive_df.loc[additive_df['idx'] == 306]
-#     elif additive == 'B(OPh)3':
-#         select_df = additive_df.loc[additive_df['idx'] == 706]
-#     elif additive == 'BNNFs':
-#         select_df = additive_df.loc[additive_df['idx'] == 563]
-#     elif additive == 'BNNFs':
-#         select_df = additive_df.loc[additive_df['idx'] == 458] 
-#     elif additive == 'Boroxines':
-#         SMILES = 'nan'
-#     elif additive == 'Na[B(hfip)4]':
-#         select_df = additive_df.loc[additive_df['idx'] == 544]
-#     elif additive == 'B(HFIP)3':
-#         select_df = additive_df.loc[additive_df['idx'] == 553]
-#     elif additive == 'K2B4O5(OH)4':
-#         select_df = additive_df.loc[additive_df['idx'] == 542]
-#     else:
-#         select_df = additive_df.loc[additive_df['additives_abbr'].str.contains(additive)]
-#     electrolyte_types = select_df['electrolyte_types'].tolist()
-#     years = select_df['years'].tolist()
+year_electrolyte_type_pair = {}
+for additive, values in additive_smiles_pair.items():
+    if additive in ['(C6H3F)O2B(C6H3F2)', '(C6H3F)O2B(C7H4F3)', '(C6H3F)O2B(C8H3F6)', '(C6F4)O2B(C6H4F)', '(C6F4)O2B(C6H3F2)', '(C6F4)O2B(C6F5)', '(C6F4)O2B(C7H3F6)', '(C6F4)O2B(C8H3F6)', '(C6F12)O2B(C6H5)', '(C6F12)O2B(C6H3F2)', '(C6F12)O2B(C6F5)', '(C3HF6O)2B(C6H5)', '(C3HF6O)2B(C6H3F2)', '(C3HF6O)2B(C6F5)']:
+        select_df = additive_df.loc[additive_df['idx'] == 306]
+    elif additive == 'B(OPh)3':
+        select_df = additive_df.loc[additive_df['idx'] == 706]
+    elif additive == 'BNNFs':
+        select_df = additive_df.loc[additive_df['idx'] == 563]
+    elif additive == 'BNNFs':
+        select_df = additive_df.loc[additive_df['idx'] == 458] 
+    elif additive == 'Boroxines':
+        SMILES = 'nan'
+    elif additive == 'Na[B(hfip)4]':
+        select_df = additive_df.loc[additive_df['idx'] == 544]
+    elif additive == 'B(HFIP)3':
+        select_df = additive_df.loc[additive_df['idx'] == 553]
+    elif additive == 'K2B4O5(OH)4':
+        select_df = additive_df.loc[additive_df['idx'] == 542]
+    else:
+        select_df = additive_df.loc[additive_df['additives_abbr'].str.contains(additive)]
+    electrolyte_types = select_df['electrolyte_types'].tolist()
+    years = select_df['years'].tolist()
 
-#     if len(years) > 1:
-#         for i, year in enumerate(years):
-#             if year in year_electrolyte_type_pair.keys():
-#                 year_electrolyte_type_pair[year].append(electrolyte_types[i])
-#             else:
-#                 year_electrolyte_type_pair[year] = [electrolyte_types[i]]
-#     else:
-#         if years[0] in year_electrolyte_type_pair.keys():
-#             year_electrolyte_type_pair[years[0]].append(electrolyte_types[0])
-#         else:
-#             year_electrolyte_type_pair[years[0]] = [electrolyte_types[0]]
+    if len(years) > 1:
+        for i, year in enumerate(years):
+            if year in year_electrolyte_type_pair.keys():
+                year_electrolyte_type_pair[year].append(electrolyte_types[i])
+            else:
+                year_electrolyte_type_pair[year] = [electrolyte_types[i]]
+    else:
+        if years[0] in year_electrolyte_type_pair.keys():
+            year_electrolyte_type_pair[years[0]].append(electrolyte_types[0])
+        else:
+            year_electrolyte_type_pair[years[0]] = [electrolyte_types[0]]
 
-# for year, types in year_electrolyte_type_pair.items():
-#     type_counter = Counter(types)
-#     year_electrolyte_type_pair[year] = dict(type_counter)
+for year, types in year_electrolyte_type_pair.items():
+    type_counter = Counter(types)
+    year_electrolyte_type_pair[year] = dict(type_counter)
 
-# df = pd.DataFrame(year_electrolyte_type_pair).T.fillna(0)
-# df = df[['Liquid', 'Solid-State', 'Polymer']]
-# df = df.sort_index() 
+df = pd.DataFrame(year_electrolyte_type_pair).T.fillna(0)
+df = df[['Liquid', 'Solid-State', 'Polymer']]
+df = df.sort_index() 
 
-# df_percent = df.div(df.sum(axis=1), axis=0) * 100
+df_percent = df.div(df.sum(axis=1), axis=0) * 100
 
-# plt.figure(figsize=(12,6))
-# df.plot(kind='bar', stacked=True, color=['#4C72B0', '#55A868', '#C44E52'], width=0.8)
+plt.figure(figsize=(12,6))
+df.plot(kind='bar', stacked=True, color=['#4C72B0', '#55A868', '#C44E52'], width=0.8)
 
-# plt.title("Proportion of Electrolyte Types by Year", fontsize=14)
-# plt.xlabel("Year", fontsize=12)
-# plt.ylabel("Percentage (%)", fontsize=12)
-# plt.legend(title="Type", loc='upper left')
-# plt.xticks(rotation=45)
-# plt.tight_layout()
-# plt.savefig('./V3/plots/electrolyte_type_trend.png', dpi=600)
+plt.title("Proportion of Electrolyte Types by Year", fontsize=14)
+plt.xlabel("Year", fontsize=12)
+plt.ylabel("Counts", fontsize=12)
+plt.legend(title="Type", loc='upper left')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig('./V3/plots/electrolyte_type_trend.png', dpi=600)
 
 
 # hybirdization vs electrolyte type
@@ -277,7 +277,7 @@ df.plot(kind='bar', stacked=True, color=['#4C72B0', '#55A868', '#C44E52'], width
 
 plt.title("Proportion of Electrolyte Types by Hybridization of Boron Element", fontsize=12)
 plt.xlabel("Hybridization Ways", fontsize=12)
-plt.ylabel("Percentage (%)", fontsize=12)
+plt.ylabel("Counts", fontsize=12)
 plt.legend(title="Type", loc='upper left')
 plt.xticks(rotation=45)
 plt.tight_layout()
