@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention, LayerNorm
 from torch_geometric.nn import GCNConv, GINEConv, global_mean_pool
@@ -12,7 +13,7 @@ class GCN(torch.nn.Module):
         self.lin = Linear(hidden_channels, num_classes)
         self.dropout = Dropout(dropout)
 
-    def forward(self, x, edge_index, edge_attr, batch, descriptors):
+    def forward(self, x, edge_index, batch):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.dropout(x)
@@ -23,7 +24,6 @@ class GCN(torch.nn.Module):
 
         x = global_mean_pool(x, batch)
 
-        x = self.lin(x)
         return x
 
 class GCN_with_descriptor(torch.nn.Module):
@@ -192,3 +192,18 @@ class GINE_descriptor(torch.nn.Module):
         x = self.lin2(x)
         
         return x
+
+
+
+class ProjectionHead(nn.Module):
+    def __init__(self, in_dim, proj_dim=128):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, in_dim),
+            nn.ReLU(),
+            nn.Linear(in_dim, proj_dim)
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
+

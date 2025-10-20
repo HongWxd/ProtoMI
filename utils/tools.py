@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -8,14 +9,15 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from sklearn.metrics import normalized_mutual_info_score
-from ase import Atoms
-from dscribe.descriptors import SOAP
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import Data
 from sklearn.utils.class_weight import compute_class_weight
 import matminer.featurizers.composition as mm_composition
 import matminer.featurizers.structure as mm_structure
 from pymatgen.core import Composition
+from torch_geometric.utils import subgraph
+
+
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -124,11 +126,11 @@ def getMolDescriptors(mol, missingVal=None):
         res.append(val)
     return res
 
-def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
+def Graph_data_generator(x_smiles, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
     # convert SMILES to RDKit mol object   
     mol = Chem.MolFromSmiles(x_smiles)
     if mol == None:
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
     # get feature dimensions
     n_nodes = mol.GetNumAtoms()
@@ -161,19 +163,19 @@ def Graph_data_generator(x_smiles, formula, y, mass_mean, mass_std, vdw_mean, vd
     EF = torch.tensor(EF, dtype = torch.float)
     
     # construct label tensor
-    y_tensor = torch.tensor(np.array([y]), dtype = torch.long)
+    # y_tensor = torch.tensor(np.array([y]), dtype = torch.long)
     
     # construct Pytorch Geometric data object and append to data list
     x = X
     edge_index = E
     edge_attr = EF
-    label = y_tensor
+    # label = y_tensor
     n_nodes = n_nodes
     n_edges = n_edges
     n_node_features = n_node_features
     n_edge_features = n_edge_features
 
-    return x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features
+    return x, edge_index, edge_attr, n_nodes, n_edges, n_node_features, n_edge_features
 
 def get_statistical_values(x_smiles):
     mol = Chem.MolFromSmiles(x_smiles)
@@ -384,4 +386,24 @@ def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     plt.tight_layout()
     plt.savefig(f'./figs/fold_{fold+1}_loss_AUC_curve.png', dpi=600)
 
+def feature_noise(data, noise_level=0.1):
+    x = data.x + noise_level * torch.randn_like(data.x)
+    return Data(x=x, edge_index=data.edge_index, edge_attr=data.edge_attr)
 
+def perturb_edges(data, perturb_ratio=0.1):
+    edge_index = data.edge_index.clone()
+    num_edges = edge_index.size(1)
+    num_nodes = data.n_nodes
+
+    num_delete = int(num_edges * perturb_ratio / 2)
+    mask = torch.ones(num_edges, dtype=torch.bool)
+    del_indices = random.sample(range(num_edges), num_delete)
+    mask[del_indices] = False
+    edge_index = edge_index[:, mask]
+
+    num_add = num_delete
+    new_edges = torch.randint(0, num_nodes, (2, num_add))
+    edge_index = torch.cat([edge_index, new_edges], dim=1)
+
+    data.edge_index = edge_index
+    return data

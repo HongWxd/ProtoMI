@@ -1,5 +1,5 @@
 import pickle
-from utils.data_loader import MoleculeDataset
+from utils.data_loader_CL import MoleculeDataset
 import itertools
 from tqdm import tqdm
 import warnings
@@ -7,8 +7,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # paths
-labeled_path = './data/labeled_data.csv'
-unlabeled_path = './data/unlabeled_data.csv'
+labeled_path = './V3/processed_data/additives.json'
 searching_space_path = './data/searching_space_data.csv'
 train_data_path = './data/train_data.pkl'
 val_data_path = './data/val_data.pkl'
@@ -16,7 +15,7 @@ test_data_path = './data/test_data.pkl'
 all_data_path = './data/all_data.pkl'
 
 # load the dataset
-dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is_baseline=True, load_flag=True, load_descriptors=True)
+dataset = MoleculeDataset(labeled_path, searching_space_path)
 # norm_MD, norm_VO, norm_YSS, norm_normal = dataset.norm_MD, dataset.norm_VO, dataset.norm_YSS, dataset.norm_normal
 # print(len(dataset.data), len(norm_normal), len(dataset.baseline_data))
 
@@ -29,8 +28,8 @@ dataset = MoleculeDataset(labeled_path, unlabeled_path, searching_space_path, is
 # with open('./data/norm_normal.pkl', 'wb') as file:
 #     pickle.dump(dataset.norm_normal, file)
 
-# with open('./data/all_data.pkl', 'wb') as file:
-#     pickle.dump(dataset.data, file)
+with open('./data/all_data.pkl', 'wb') as file:
+    pickle.dump(dataset.data, file)
 
 # with open('./data/baseline_data.pkl', 'wb') as file:
 #     pickle.dump(dataset.baseline_data, file)
