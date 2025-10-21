@@ -407,3 +407,17 @@ def perturb_edges(data, perturb_ratio=0.1):
 
     data.edge_index = edge_index
     return data
+
+def plot_train_loss(num_epochs, train_loss, model):
+    epochs = list(range(1, num_epochs+1))
+
+    plt.figure(figsize=(12, 5))
+    plt.plot(epochs, train_loss, marker='o', label='Train Loss', color='tab:blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'{model} Train Loss Curve')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(f'./figs/{model}_train_loss_curve.png', dpi=600)

@@ -21,13 +21,16 @@ class MoleculeDataset(Dataset):
         self.cids = [int(i) for i in self.cids]
 
         self.all_smiles = []
+        self.id = []
         # load all molecules smiles
-        for smile in tqdm(self.reported_smiles, desc='Loading all reported molecules'):
+        for smile, formula in tqdm(zip(self.reported_smiles, self.reported_formulas), desc='Loading all reported molecules'):
             self.all_smiles.append(smile)
+            self.id.append(formula)
 
         for cid in tqdm(self.cids, desc='Loading all molecules from searching space'):
             _, _, smile, _, _, _, _ = self.read_from_one_call(cid)
             self.all_smiles.append(smile)
+            self.id.append(cid)
 
         self.data = self.load_data()
         
@@ -39,13 +42,13 @@ class MoleculeDataset(Dataset):
 
         data_list = []
         # add all molecules data
-        for smile in tqdm(self.all_smiles, desc='Converting all smiles data to graph data'):
+        for smile, id in tqdm(zip(self.all_smiles, self.id), desc='Converting all smiles data to graph data'):
             # get the graph data for each compound
             x, edge_index, edge_attr, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this molecule
 
-            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
+            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, id = id, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             data_list.append(graph_data)
         
         return data_list        
