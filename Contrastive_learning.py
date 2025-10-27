@@ -57,7 +57,7 @@ with open('./data/all_data.pkl', 'rb') as f:
 
 positive_samples = all_data[:126]
 unlabeled_samples = all_data[126:]
-dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=1)
+dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=5)
 loader = DataLoader(
     dataset,
     batch_size=128,
