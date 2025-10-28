@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention, LayerNorm
+from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention, LayerNorm, BatchNorm1d
+from torch_geometric.nn import GraphNorm
 from torch_geometric.nn import GCNConv, GINEConv, global_mean_pool
 from layers.attention import DAN, DANLayer
 
@@ -66,30 +67,42 @@ class GINE(torch.nn.Module):
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv1 = GINEConv(nn1, edge_dim=num_edge_features)
+        self.norm1 = GraphNorm(hidden_channels)
 
         nn2 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv2 = GINEConv(nn2, edge_dim=num_edge_features)
+        self.norm2 = GraphNorm(hidden_channels)
 
         nn3 = Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
         self.conv3 = GINEConv(nn3, edge_dim=num_edge_features)
+        self.norm3 = GraphNorm(hidden_channels)
 
         self.dropout = Dropout(dropout)
+        self.fc_out = Linear(hidden_channels, num_classes)
+        self.batch_norm = BatchNorm1d(hidden_channels)
 
 
     def forward(self, x, edge_index, edge_attr, batch): 
         x = self.conv1(x, edge_index, edge_attr)
+        x = self.norm1(x)
         x = F.relu(x)
         x = self.dropout(x)
 
         x = self.conv2(x, edge_index, edge_attr)
+        x = self.norm2(x)
         x = F.relu(x)
         x = self.dropout(x)
 
         x = self.conv3(x, edge_index, edge_attr)
+        x = self.norm3(x)
         x = F.relu(x)
         x = self.dropout(x)
 
         x = global_mean_pool(x, batch)
+
+        x = self.batch_norm(x)
+
+        # x = self.fc_out(x)
 
         return x
 

@@ -66,11 +66,11 @@ def get_embeddings(encoder, dataloader):
 emb_pos = get_embeddings(encoder, pos_loader)
 emb_unlab = get_embeddings(encoder, unl_loader)
 
-# 计算相似度
+
 sim_matrix = torch.mm(F.normalize(emb_unlab, dim=1), F.normalize(emb_pos, dim=1).T)
 mean_sim = sim_matrix.mean(dim=1)
 
-# 排序
+
 sorted_idx = torch.argsort(mean_sim, descending=True)
 ranked_unlabeled = [unlabeled_samples[i].id for i in sorted_idx]
 searching_space_df = pd.read_csv('./data/searching_space_data.csv')

@@ -358,69 +358,69 @@ with open('./V3/processed_data/additives.json', "w", encoding="utf-8") as f:
 
 
 
-# hybirdization vs electrolyte type
-hybridization_electrolyte_type_pair = {}
-for additive, values in new_dict.items():
-    if additive in ['(C6H3F)O2B(C6H3F2)', '(C6H3F)O2B(C7H4F3)', '(C6H3F)O2B(C8H3F6)', '(C6F4)O2B(C6H4F)', '(C6F4)O2B(C6H3F2)', '(C6F4)O2B(C6F5)', '(C6F4)O2B(C7H3F6)', '(C6F4)O2B(C8H3F6)', '(C6F12)O2B(C6H5)', '(C6F12)O2B(C6H3F2)', '(C6F12)O2B(C6F5)', '(C3HF6O)2B(C6H5)', '(C3HF6O)2B(C6H3F2)', '(C3HF6O)2B(C6F5)']:
-        select_df = additive_df.loc[additive_df['idx'] == 306]
-    elif additive == 'B(OPh)3':
-        select_df = additive_df.loc[additive_df['idx'] == 706]
-    elif additive == 'BNNFs':
-        select_df = additive_df.loc[additive_df['idx'] == 563]
-    elif additive == 'BNNFs':
-        select_df = additive_df.loc[additive_df['idx'] == 458] 
-    elif additive == 'Boroxines':
-        SMILES = 'nan'
-    elif additive == 'Na[B(hfip)4]':
-        select_df = additive_df.loc[additive_df['idx'] == 544]
-    elif additive == 'B(HFIP)3':
-        select_df = additive_df.loc[additive_df['idx'] == 553]
-    elif additive == 'K2B4O5(OH)4':
-        select_df = additive_df.loc[additive_df['idx'] == 542]
-    else:
-        select_df = additive_df.loc[additive_df['additives_abbr'].str.contains(additive)]
-    electrolyte_types = select_df['electrolyte_types'].tolist()
-    hybridization_types = list(set(values['hybridization']))
+# # hybirdization vs electrolyte type
+# hybridization_electrolyte_type_pair = {}
+# for additive, values in new_dict.items():
+#     if additive in ['(C6H3F)O2B(C6H3F2)', '(C6H3F)O2B(C7H4F3)', '(C6H3F)O2B(C8H3F6)', '(C6F4)O2B(C6H4F)', '(C6F4)O2B(C6H3F2)', '(C6F4)O2B(C6F5)', '(C6F4)O2B(C7H3F6)', '(C6F4)O2B(C8H3F6)', '(C6F12)O2B(C6H5)', '(C6F12)O2B(C6H3F2)', '(C6F12)O2B(C6F5)', '(C3HF6O)2B(C6H5)', '(C3HF6O)2B(C6H3F2)', '(C3HF6O)2B(C6F5)']:
+#         select_df = additive_df.loc[additive_df['idx'] == 306]
+#     elif additive == 'B(OPh)3':
+#         select_df = additive_df.loc[additive_df['idx'] == 706]
+#     elif additive == 'BNNFs':
+#         select_df = additive_df.loc[additive_df['idx'] == 563]
+#     elif additive == 'BNNFs':
+#         select_df = additive_df.loc[additive_df['idx'] == 458] 
+#     elif additive == 'Boroxines':
+#         SMILES = 'nan'
+#     elif additive == 'Na[B(hfip)4]':
+#         select_df = additive_df.loc[additive_df['idx'] == 544]
+#     elif additive == 'B(HFIP)3':
+#         select_df = additive_df.loc[additive_df['idx'] == 553]
+#     elif additive == 'K2B4O5(OH)4':
+#         select_df = additive_df.loc[additive_df['idx'] == 542]
+#     else:
+#         select_df = additive_df.loc[additive_df['additives_abbr'].str.contains(additive)]
+#     electrolyte_types = select_df['electrolyte_types'].tolist()
+#     hybridization_types = list(set(values['hybridization']))
 
-    if hybridization_types[0] in hybridization_electrolyte_type_pair.keys():
-        if len(electrolyte_types) > 1:
-            for etype in electrolyte_types:
-                    hybridization_electrolyte_type_pair[hybridization_types[0]].append(etype)
-        else:
-            hybridization_electrolyte_type_pair[hybridization_types[0]].append(electrolyte_types[0])
-    else:
-        if len(electrolyte_types) > 1:
-            for i, etype in enumerate(electrolyte_types):
-                if i < 1:
-                    hybridization_electrolyte_type_pair[hybridization_types[0]] = [electrolyte_types[0]]
-                else:
-                    hybridization_electrolyte_type_pair[hybridization_types[0]].append(etype)
-        else:
-            hybridization_electrolyte_type_pair[hybridization_types[0]] = [electrolyte_types[0]]
+#     if hybridization_types[0] in hybridization_electrolyte_type_pair.keys():
+#         if len(electrolyte_types) > 1:
+#             for etype in electrolyte_types:
+#                     hybridization_electrolyte_type_pair[hybridization_types[0]].append(etype)
+#         else:
+#             hybridization_electrolyte_type_pair[hybridization_types[0]].append(electrolyte_types[0])
+#     else:
+#         if len(electrolyte_types) > 1:
+#             for i, etype in enumerate(electrolyte_types):
+#                 if i < 1:
+#                     hybridization_electrolyte_type_pair[hybridization_types[0]] = [electrolyte_types[0]]
+#                 else:
+#                     hybridization_electrolyte_type_pair[hybridization_types[0]].append(etype)
+#         else:
+#             hybridization_electrolyte_type_pair[hybridization_types[0]] = [electrolyte_types[0]]
         
-print(hybridization_electrolyte_type_pair)
+# print(hybridization_electrolyte_type_pair)
 
-for hybridization, types in hybridization_electrolyte_type_pair.items():
-    type_counter = Counter(types)
-    hybridization_electrolyte_type_pair[hybridization] = dict(type_counter)
+# for hybridization, types in hybridization_electrolyte_type_pair.items():
+#     type_counter = Counter(types)
+#     hybridization_electrolyte_type_pair[hybridization] = dict(type_counter)
 
 
-df = pd.DataFrame(hybridization_electrolyte_type_pair)
-df = df[['SP2', 'SP3']].T.fillna(0)
-df = df[['Liquid', 'Solid-State', 'Polymer']]
-df = df.sort_index() 
+# df = pd.DataFrame(hybridization_electrolyte_type_pair)
+# df = df[['SP2', 'SP3']].T.fillna(0)
+# df = df[['Liquid', 'Solid-State', 'Polymer']]
+# df = df.sort_index() 
 
-df_percent = df.div(df.sum(axis=1), axis=0) * 100
+# df_percent = df.div(df.sum(axis=1), axis=0) * 100
 
-plt.figure(figsize=(12,6))
-df.plot(kind='bar', stacked=True, color=['#4C72B0', '#55A868', '#C44E52'], width=0.8)
+# plt.figure(figsize=(12,6))
+# df.plot(kind='bar', stacked=True, color=['#4C72B0', '#55A868', '#C44E52'], width=0.8)
 
-plt.title("Proportion of Electrolyte Types by Hybridization of Boron Element", fontsize=12)
-plt.xlabel("Hybridization Ways", fontsize=12)
-plt.ylabel("Counts", fontsize=12)
-plt.legend(title="Type", loc='lower left')
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.savefig('./V3/plots/electrolyte_type_hybridization.png', dpi=600)
+# plt.title("Proportion of Electrolyte Types by Hybridization of Boron Element", fontsize=12)
+# plt.xlabel("Hybridization Ways", fontsize=12)
+# plt.ylabel("Counts", fontsize=12)
+# plt.legend(title="Type", loc='lower left')
+# plt.xticks(rotation=45)
+# plt.tight_layout()
+# plt.savefig('./V3/plots/electrolyte_type_hybridization.png', dpi=600)
 
 
