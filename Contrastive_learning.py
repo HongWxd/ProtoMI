@@ -24,9 +24,9 @@ parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learnin
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=50, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--folds', type=int, default=10, help='Fold number of cross validation')
+parser.add_argument('--ratio', type=int, default=1, help='negative samples ratio')
 parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
-parser.add_argument('--models', type=str, default='GCN', help='Training models')
+parser.add_argument('--models', type=str, default='GINE', help='Training models')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
 parser.add_argument('--warm_up_epoch', type=int, default=30, help='Self training warm up epoch period')
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
@@ -57,7 +57,7 @@ with open('./data/all_data.pkl', 'rb') as f:
 
 positive_samples = all_data[:126]
 unlabeled_samples = all_data[126:]
-dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=5)
+dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=args.ratio)
 loader = DataLoader(
     dataset,
     batch_size=128,

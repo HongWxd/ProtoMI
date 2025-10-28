@@ -87,9 +87,9 @@ plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.savefig("./V3/plots/pca_projection_scatter.png", dpi=300)
 
-print("累计解释率（前10维）:")
+# print("累计解释率（前10维）:")
 for i, e in enumerate(explained):
-    print(f"前 {i+1} 个主成分累计解释率: {e*100:.2f}%")
+    print(f"Rank {i+1} cumulative explanation rate of principal components: {e*100:.2f}%")
 
 # # 可视化
 # plt.figure(figsize=(6,4))
