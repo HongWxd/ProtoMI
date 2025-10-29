@@ -42,7 +42,7 @@ class MoleculeDataset(Dataset):
 
         data_list = []
         # add all molecules data
-        for smile, id in tqdm(zip(self.all_smiles, self.id), desc='Converting all smiles data to graph data'):
+        for smile, id in zip(tqdm(self.all_smiles, desc='Converting all smiles data to graph data'), self.id):
             # get the graph data for each compound
             x, edge_index, edge_attr, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
@@ -50,6 +50,17 @@ class MoleculeDataset(Dataset):
 
             graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, id = id, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
             data_list.append(graph_data)
+        
+        # normalization for edge features
+        all_edge_attrs = [data.edge_attr for data in data_list if data.edge_attr is not None]
+        all_edge_attrs = torch.cat(all_edge_attrs, dim=0)
+
+        edge_mean = all_edge_attrs.mean(dim=0, keepdim=True)
+        edge_std = all_edge_attrs.std(dim=0, keepdim=True) + 1e-6
+
+        for data in data_list:
+            if data.edge_attr is not None:
+                data.edge_attr = (data.edge_attr - edge_mean) / edge_std
         
         return data_list        
 

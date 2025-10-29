@@ -75,5 +75,14 @@ sorted_idx = torch.argsort(mean_sim, descending=True)
 ranked_unlabeled = [unlabeled_samples[i].id for i in sorted_idx]
 searching_space_df = pd.read_csv('./data/searching_space_data.csv')
 for id in ranked_unlabeled[:50]:
-    formula = str(searching_space_df.loc[searching_space_df['cid'] == float(id), 'formula'].values[0])
-    print(f'CID: {id}, Formula: {formula}')
+    try:
+        formula = str(searching_space_df.loc[searching_space_df['cid'] == float(id), 'SMILES'].values[0])
+        
+        if formula.startswith("B") and formula.endswith("(O)O"):
+            continue
+        else:
+            print(f'CID: {id}, Formula: {formula}')
+    except:
+        continue
+
+

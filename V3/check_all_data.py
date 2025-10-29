@@ -10,25 +10,25 @@ data_path = './data/all_data.pkl'
 with open(data_path, 'rb') as f:
     dataset = pickle.load(f)
 
-# node_counts = [data.num_nodes for data in dataset]
-# edge_counts = [data.num_edges for data in dataset]
+node_counts = [data.num_nodes for data in dataset]
+edge_counts = [data.num_edges for data in dataset]
 
-# # 计算方差与标准差
-# node_var = np.var(node_counts)
-# edge_var = np.var(edge_counts)
+# 计算方差与标准差
+node_var = np.var(node_counts)
+edge_var = np.var(edge_counts)
 
-# print(f"节点数方差: {node_var:.2f}, 标准差: {np.std(node_counts):.2f}")
-# print(f"边数方差: {edge_var:.2f}, 标准差: {np.std(edge_counts):.2f}")
+print(f"节点数方差: {node_var:.2f}, 标准差: {np.std(node_counts):.2f}")
+print(f"边数方差: {edge_var:.2f}, 标准差: {np.std(edge_counts):.2f}")
 
-# # 简单可视化
-# plt.figure(figsize=(10,10))
-# sns.jointplot(x=node_counts, y=edge_counts, kind="scatter", color="#4C72B0")
-# plt.xlabel("Number of nodes")
-# plt.ylabel("Number of edges")
-# plt.title("Graph size distribution (nodes vs edges)", y=1.02)
-# plt.tight_layout()
-# plt.savefig("./V3/plots/graph_size_distribution.png", dpi=300)
-# plt.clf()
+# 简单可视化
+plt.figure(figsize=(10,10))
+sns.jointplot(x=node_counts, y=edge_counts, kind="scatter", color="#4C72B0")
+plt.xlabel("Number of nodes")
+plt.ylabel("Number of edges")
+plt.title("Graph size distribution (nodes vs edges)", y=1.02)
+plt.tight_layout()
+plt.savefig("./V3/plots/graph_size_distribution.png", dpi=300)
+plt.clf()
 
 
 
@@ -36,7 +36,7 @@ with open(data_path, 'rb') as f:
 all_node_features = []
 for data in dataset:
     if hasattr(data, 'x') and data.x is not None:
-        all_node_features.append(data.x.numpy())
+        all_node_features.append(data.edge_attr.numpy())
 
 X = np.vstack(all_node_features)
 
@@ -67,7 +67,7 @@ sns.heatmap(loadings_subset,
             annot=False)
 
 plt.title("Feature Contributions (Loadings) for Top Principal Components")
-plt.xlabel("Original Node Features")
+plt.xlabel("Original edge Features")
 plt.ylabel("Principal Components")
 plt.tight_layout()
 plt.savefig("./V3/plots/pca_feature_loadings_heatmap.png", dpi=300)
@@ -82,7 +82,7 @@ plt.figure(figsize=(6, 5))
 plt.scatter(X_pca[:, 0], X_pca[:, 1], s=5, alpha=0.6, color="#55A868")
 plt.xlabel(f"PC1 ({explained[0]*100:.2f}% var)")
 plt.ylabel(f"PC2 ({explained[1]*100:.2f}% var)")
-plt.title("PCA Projection of Node Features")
+plt.title("PCA Projection of edge Features")
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.savefig("./V3/plots/pca_projection_scatter.png", dpi=300)
@@ -91,12 +91,12 @@ plt.savefig("./V3/plots/pca_projection_scatter.png", dpi=300)
 for i, e in enumerate(explained):
     print(f"Rank {i+1} cumulative explanation rate of principal components: {e*100:.2f}%")
 
-# # 可视化
-# plt.figure(figsize=(6,4))
-# plt.plot(np.arange(1, len(explained)+1), explained*100, marker='o', color="#C44E52")
-# plt.title("PCA cumulative explained variance of node features")
-# plt.xlabel("Number of principal components")
-# plt.ylabel("Cumulative explained variance (%)")
-# plt.grid(True)
-# plt.tight_layout()
-# plt.savefig("./V3/plots/pca_explained_variance.png", dpi=300)
+# 可视化
+plt.figure(figsize=(6,4))
+plt.plot(np.arange(1, len(explained)+1), explained*100, marker='o', color="#C44E52")
+plt.title("PCA cumulative explained variance of edge features")
+plt.xlabel("Number of principal components")
+plt.ylabel("Cumulative explained variance (%)")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("./V3/plots/pca_explained_variance.png", dpi=300)

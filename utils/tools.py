@@ -77,7 +77,10 @@ def get_bond_features(bond,
     bond_type_enc = one_hot_encoding(bond.GetBondType(), permitted_list_of_bond_types)
     bond_is_conj_enc = [int(bond.GetIsConjugated())]
     bond_is_in_ring_enc = [int(bond.IsInRing())]
-    bond_feature_vector = bond_type_enc + bond_is_conj_enc + bond_is_in_ring_enc
+
+    bond_dir_enc = one_hot_encoding(str(bond.GetBondDir()), ["NONE", "BEGINWEDGE", "BEGINDASH", "ENDDOWNRIGHT", "ENDUPRIGHT"])
+    bond_is_aromatic_enc = [int(bond.GetIsAromatic())]
+    bond_feature_vector = bond_type_enc + bond_is_conj_enc + bond_is_in_ring_enc + bond_dir_enc + bond_is_aromatic_enc
     
     if use_stereochemistry == True:
         stereo_type_enc = one_hot_encoding(str(bond.GetStereo()), ["STEREOZ", "STEREOE", "STEREOANY", "STEREONONE"])
@@ -421,3 +424,11 @@ def plot_train_loss(num_epochs, train_loss, model):
 
     plt.tight_layout()
     plt.savefig(f'./figs/{model}_train_loss_curve.png', dpi=600)
+
+def nnPU_loss(g_p, g_u, prior=0.3, beta=0.1):
+    loss_pos = F.sigmoid(-g_p).mean()      # ℓ(g,+1)
+    loss_neg = F.sigmoid(g_u).mean()       # ℓ(g,-1)
+    loss_neg_pos = F.sigmoid(g_p).mean()   # ℓ(g,-1) on positive samples
+    risk = prior * (loss_pos - loss_neg_pos) + loss_neg
+    # return torch.where(risk >= 0, risk, -beta * risk)
+    return risk

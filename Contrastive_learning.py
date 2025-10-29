@@ -24,7 +24,7 @@ parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learnin
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=50, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
-parser.add_argument('--ratio', type=int, default=1, help='negative samples ratio')
+parser.add_argument('--ratio', type=int, default=15, help='negative samples ratio')
 parser.add_argument('--patience', type=int, default=15, help='Patience for early stopping')
 parser.add_argument('--models', type=str, default='GINE', help='Training models')
 parser.add_argument('--threshold', type=float, default=0.95, help='Threshold of self training')
