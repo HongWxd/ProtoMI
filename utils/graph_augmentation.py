@@ -4,25 +4,28 @@ from torch_geometric.utils import subgraph
 from torch_geometric.utils import to_networkx, from_networkx
 import networkx as nx
 import random
+from torch_geometric.utils import to_dense_adj, dense_to_sparse
+import torch.nn.functional as F
+from sklearn.model_selection import train_test_split
 
 class Graph_Augmentation_Helper():
     def __init__(self, positive_samples, args):
         self.pos_samples = positive_samples
         self.aug_types = args.aug_types
+        self.random_state = args.random_state
+        self.test_size = args.test_size
+
+        # augmentation configs
         self.shuffle_ratio = args.shuffle_ratio
+        self.noise_ratio = args.noise_ratio
+        self.noise_std = args.noise_std
         self.node_drop_ratio = args.node_drop_ratio
         self.edge_drop_ratio = args.edge_drop_ratio
         self.edge_add_ratio = args.edge_add_ratio
-
-        if self.aug_types == 'all':
-            # feature-level augmentation
-            self.node_mixup_samples = self.node_feature_shuffle(self.pos_samples, self.shuffle_ratio)
-            
-            # node and edge level augmentation
-            self.node_dropping_samples = self.node_dropping(self.pos_samples, self.node_drop_ratio)
-            self.edge_perturbation_weighted_samples = self.edge_perturbation_weighted(self.pos_samples, self.edge_drop_ratio, self.edge_add_ratio)
-
-            # graph-level augmetation
+        self.alpha = args.alpha
+        self.PPR_drop_ratio = args.PPR_drop_ratio
+        self.PPR_add_ratio = args.PPR_add_ratio
+        self.K = args.K
 
 
     def node_feature_shuffle(self, samples, shuffle_ratio):
@@ -42,6 +45,23 @@ class Graph_Augmentation_Helper():
 
         return shuffled_samples
     
+
+    def node_feature_noise_masking(self, samples, noise_ratio, noise_std):
+        noise_masked_samples = []
+        for data in tqdm(samples, desc='Augment graph by noise masking...'):
+            x = data.x.clone()
+
+            mask = torch.rand_like(x) < noise_ratio  
+
+            noise = torch.randn_like(x) * noise_std
+            x_noisy = x + noise * mask 
+
+            new_data = data.clone()
+            new_data.x = x_noisy
+            noise_masked_samples.append(new_data)
+        
+        return noise_masked_samples
+
 
     def node_dropping(self, samples, drop_ratio=0.2):
         """
@@ -151,4 +171,108 @@ class Graph_Augmentation_Helper():
         return edge_perturbation_weighted_samples
     
 
+    def personalized_pagerank_augmentation(self, samples, alpha, drop_ratio, add_ratio, K):
+        """
+        Personalized PageRank (PPR) based graph augmentation
+        Args:
+            data: PyG Data 对象
+            alpha: teleport 概率（默认 0.15）
+            drop_ratio: 删除边比例
+            add_ratio: 添加边比例
+        """
+        PPR_samples = []
+
+        for data in tqdm(samples, desc='Augment graph by personalized pagerank...'):
+            num_nodes = data.num_nodes
+            edge_index = data.edge_index
+
+            # Step 1: 构建对称邻接矩阵
+            A = to_dense_adj(edge_index, max_num_nodes=num_nodes).squeeze(0)
+            A = (A + A.t()) / 2
+            A.fill_diagonal_(0)
+
+            # Step 2: 归一化邻接矩阵
+            deg = A.sum(dim=1)
+            deg_inv_sqrt = torch.pow(deg, -0.5)
+            deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0
+            D_inv_sqrt = torch.diag(deg_inv_sqrt)
+            A_hat = D_inv_sqrt @ A @ D_inv_sqrt
+
+            # Step 3: 近似计算 Personalized PageRank 矩阵
+            P = torch.eye(num_nodes)
+            M = torch.eye(num_nodes)
+            for _ in range(K):
+                M = (1 - alpha) * A_hat @ M
+                P += M
+            P = alpha * P
+
+            # Step 4: 删除边
+            edge_list = edge_index.t().tolist()
+            edge_scores = [P[i, j].item() for i, j in edge_list]
+            num_drop = int(len(edge_list) * drop_ratio)
+            if num_drop > 0:
+                weights = torch.tensor(edge_scores)
+                weights = (weights.max() - weights + 1e-8)  # 分数越小越容易被删
+                weights = weights / weights.sum()
+                drop_idx = torch.multinomial(weights, num_drop, replacement=False)
+                keep_edges = [edge_list[i] for i in range(len(edge_list)) if i not in drop_idx]
+            else:
+                keep_edges = edge_list
+
+            # Step 5: 添加边
+            adj = A.clone()
+            num_add = int(len(keep_edges) * add_ratio)
+            if num_add > 0:
+                candidates = [(i, j) for i in range(num_nodes) for j in range(num_nodes)
+                            if adj[i, j] == 0 and i != j]
+                if len(candidates) > 0:
+                    candidate_scores = torch.tensor([P[i, j].item() for i, j in candidates])
+                    probs = candidate_scores / candidate_scores.sum()
+                    add_idx = torch.multinomial(probs, min(num_add, len(candidates)), replacement=False)
+                    add_edges = [candidates[i] for i in add_idx]
+                    keep_edges += add_edges
+
+            new_edge_index = torch.tensor(keep_edges).t().contiguous()
+
+            # Step 6: 构建增强后的图
+            new_data = data.clone()
+            new_data.edge_index = new_edge_index
+            new_data.n_edges = new_edge_index.size(1)
+            new_data.edge_attr = data.edge_attr[:new_edge_index.size(1)]  # 直接截断（或重新初始化）
+
+            PPR_samples.append(new_data)
+
+        return PPR_samples
     
+
+    def do_augmentation(self):
+        if self.aug_types == 'all':
+            # feature-level augmentation
+            node_mixup_samples = self.node_feature_shuffle(self.pos_samples, self.shuffle_ratio)
+            noise_masking_samples = self.node_feature_noise_masking(self.pos_samples, self.noise_ratio, self.noise_std)
+            
+            # node and edge level augmentation
+            node_dropping_samples = self.node_dropping(self.pos_samples, self.node_drop_ratio)
+            edge_perturbation_weighted_samples = self.edge_perturbation_weighted(self.pos_samples, self.edge_drop_ratio, self.edge_add_ratio)
+
+            # graph-level augmetation
+            PPR_samples = self.personalized_pagerank_augmentation(self.pos_samples, self.alpha, self.PPR_drop_ratio, self.PPR_add_ratio, self.K)
+        
+        return self.pos_samples, node_mixup_samples, noise_masking_samples, node_dropping_samples, edge_perturbation_weighted_samples, PPR_samples
+
+
+    def train_test_split_positive_samples(self):
+        pos_samples, node_mixup_samples, noise_masking_samples, node_dropping_samples, edge_perturbation_weighted_samples, PPR_samples = self.do_augmentation()
+        
+        # split train, test set
+        pos_train_set, pos_test_set = train_test_split(pos_samples, test_size=self.test_size, random_state=self.random_state)
+        node_mixup_train_set, node_mixup_test_set = train_test_split(node_mixup_samples, test_size=self.test_size, random_state=self.random_state)
+        noise_mask_train_set, noise_mask_test_set = train_test_split(noise_masking_samples, test_size=self.test_size, random_state=self.random_state)
+        node_drop_train_set, node_drop_test_set = train_test_split(node_dropping_samples, test_size=self.test_size, random_state=self.random_state)
+        edge_weight_train_set, edge_weight_test_set = train_test_split(edge_perturbation_weighted_samples, test_size=self.test_size, random_state=self.random_state)
+        PPR_train_set, PPR_test_set = train_test_split(PPR_samples, test_size=self.test_size, random_state=self.random_state)
+
+        pos_train_samples = pos_train_set + node_mixup_train_set + noise_mask_train_set + node_drop_train_set + edge_weight_train_set + PPR_train_set
+        pos_test_samples = pos_test_set + node_mixup_test_set + noise_mask_test_set + node_drop_test_set + edge_weight_test_set + PPR_test_set
+
+        return pos_train_samples, pos_test_samples

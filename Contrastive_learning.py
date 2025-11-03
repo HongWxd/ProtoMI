@@ -38,25 +38,21 @@ parser.add_argument('--desp_dim', type=int, default=217, help='Number of descrip
 parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
 parser.add_argument('--shuffle_ratio', type=float, default=0.2, help='shuffle ratio')
 parser.add_argument('--node_drop_ratio', type=float, default=0.2, help='node drop ratio')
+parser.add_argument('--noise_ratio', type=float, default=0.2, help='noise_ratio')
+parser.add_argument('--noise_std', type=float, default=0.1, help='noise_std')
 parser.add_argument('--edge_drop_ratio', type=float, default=0.1, help='edge drop ratio')
 parser.add_argument('--edge_add_ratio', type=float, default=0.05, help='edge add ratio')
+parser.add_argument('--alpha', type=float, default=0.15, help='PPR alpha')
+parser.add_argument('--PPR_drop_ratio', type=float, default=0.2, help='PPR_drop_ratio')
+parser.add_argument('--PPR_add_ratio', type=float, default=0.2, help='PPR_add_ratio')
+parser.add_argument('--K', type=int, default=10, help='PPR K')
+parser.add_argument('--random_state', type=int, default=42, help='data split random seed')
+parser.add_argument('--test_size', type=float, default=0.2, help='test set size')
+
+
 
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
-
-
-def contrastive_loss(z1, z2, labels, margin=1.0):
-    """
-    z1, z2: [N, D]
-    labels: [N] (1 for positive, 0 for negative)
-    """
-    distances = F.pairwise_distance(z1, z2, keepdim=True)  # [N, 1]
-    
-    loss_pos = labels * distances.pow(2)
-    loss_neg = (1 - labels) * F.relu(margin - distances).pow(2)
-    loss = 0.5 * (loss_pos + loss_neg)
-    
-    return loss.mean()
 
 
 # data preparation
@@ -66,67 +62,24 @@ with open('./data/all_data.pkl', 'rb') as f:
 positive_samples = all_data[:126]
 unlabeled_samples = all_data[126:]
 graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
+pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()
+print(pos_train_samples[0])
 
 
-# dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=args.ratio)
-# loader = DataLoader(
-#     dataset,
-#     batch_size=128,
-#     shuffle=True,
-#     collate_fn=lambda b: contrastive_collate_fn(b, dataset)
-# ) 
 
 
-# # model preparation
-# if args.models == 'GCN':
-#     encoder = GCN(num_node_features=all_data[0].n_node_features, num_edge_features=all_data[0].n_edge_features, 
-#             hidden_channels=args.hidden_channels,
-#             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-# elif args.models == 'GINE':
-#     encoder = GINE(num_node_features=all_data[0].n_node_features, num_edge_features=all_data[0].n_edge_features, 
-#             hidden_channels=args.hidden_channels,
-#             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-
-# projector = ProjectionHead(in_dim=args.embed_dim, proj_dim=128).to(device)
 
 
-# # model training
-# optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projector.parameters()), lr=args.learning_rate)
 
-# train_loss = []
-# for epoch in range(args.epoch):  
-#     encoder.train()
-#     total_loss = 0
 
-#     for i, (pairs, label) in enumerate(loader):
-#         g1_list = [p[0] for p in pairs]
-#         g2_list = [p[1] for p in pairs]
 
-#         batch1 = Batch.from_data_list(g1_list).to(device)
-#         batch2 = Batch.from_data_list(g2_list).to(device)
-#         label = label.to(device)
 
-#         if args.models == 'GCN':
-#             # GCN
-#             h1 = encoder(batch1.x, batch1.edge_index, batch1.batch)
-#             h2 = encoder(batch2.x, batch2.edge_index, batch2.batch)
-#         elif args.models == 'GINE':
-#             # GINE
-#             h1 = encoder(batch1.x, batch1.edge_index, batch1.edge_attr, batch1.batch)
-#             h2 = encoder(batch2.x, batch2.edge_index, batch2.edge_attr, batch2.batch)
 
-#         z1 = projector(h1)
-#         z2 = projector(h2)
 
-#         loss = contrastive_loss(z1, z2, label)
 
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-#         total_loss += loss.item()
-    
-#     train_loss.append(total_loss / len(pairs))
-#     print(f"Epoch {epoch+1}: Loss = {total_loss / len(pairs)}")
+
+
+
 
 # plot_train_loss(args.epoch, train_loss, args.models)
 
