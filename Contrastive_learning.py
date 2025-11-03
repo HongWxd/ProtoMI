@@ -8,6 +8,7 @@ import time
 import pickle
 from utils.tools import plot_train_loss
 from utils.data_loader_CL import ContrastiveGraphDataset, contrastive_collate_fn
+from utils.graph_augmentation import Graph_Augmentation_Helper
 from sklearn.model_selection import KFold
 import numpy as np
 import torch.nn.functional as F
@@ -33,6 +34,13 @@ parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimens
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 
+# graph augmentation configs
+parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
+parser.add_argument('--shuffle_ratio', type=float, default=0.2, help='shuffle ratio')
+parser.add_argument('--node_drop_ratio', type=float, default=0.2, help='node drop ratio')
+parser.add_argument('--edge_drop_ratio', type=float, default=0.1, help='edge drop ratio')
+parser.add_argument('--edge_add_ratio', type=float, default=0.05, help='edge add ratio')
+
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
@@ -57,67 +65,70 @@ with open('./data/all_data.pkl', 'rb') as f:
 
 positive_samples = all_data[:126]
 unlabeled_samples = all_data[126:]
-dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=args.ratio)
-loader = DataLoader(
-    dataset,
-    batch_size=128,
-    shuffle=True,
-    collate_fn=lambda b: contrastive_collate_fn(b, dataset)
-) 
+graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
 
 
-# model preparation
-if args.models == 'GCN':
-    encoder = GCN(num_node_features=all_data[0].n_node_features, num_edge_features=all_data[0].n_edge_features, 
-            hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-elif args.models == 'GINE':
-    encoder = GINE(num_node_features=all_data[0].n_node_features, num_edge_features=all_data[0].n_edge_features, 
-            hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-
-projector = ProjectionHead(in_dim=args.embed_dim, proj_dim=128).to(device)
+# dataset = ContrastiveGraphDataset(positive_samples, unlabeled_samples, ratio=args.ratio)
+# loader = DataLoader(
+#     dataset,
+#     batch_size=128,
+#     shuffle=True,
+#     collate_fn=lambda b: contrastive_collate_fn(b, dataset)
+# ) 
 
 
-# model training
-optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projector.parameters()), lr=args.learning_rate)
+# # model preparation
+# if args.models == 'GCN':
+#     encoder = GCN(num_node_features=all_data[0].n_node_features, num_edge_features=all_data[0].n_edge_features, 
+#             hidden_channels=args.hidden_channels,
+#             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+# elif args.models == 'GINE':
+#     encoder = GINE(num_node_features=all_data[0].n_node_features, num_edge_features=all_data[0].n_edge_features, 
+#             hidden_channels=args.hidden_channels,
+#             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 
-train_loss = []
-for epoch in range(args.epoch):  
-    encoder.train()
-    total_loss = 0
+# projector = ProjectionHead(in_dim=args.embed_dim, proj_dim=128).to(device)
 
-    for i, (pairs, label) in enumerate(loader):
-        g1_list = [p[0] for p in pairs]
-        g2_list = [p[1] for p in pairs]
 
-        batch1 = Batch.from_data_list(g1_list).to(device)
-        batch2 = Batch.from_data_list(g2_list).to(device)
-        label = label.to(device)
+# # model training
+# optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projector.parameters()), lr=args.learning_rate)
 
-        if args.models == 'GCN':
-            # GCN
-            h1 = encoder(batch1.x, batch1.edge_index, batch1.batch)
-            h2 = encoder(batch2.x, batch2.edge_index, batch2.batch)
-        elif args.models == 'GINE':
-            # GINE
-            h1 = encoder(batch1.x, batch1.edge_index, batch1.edge_attr, batch1.batch)
-            h2 = encoder(batch2.x, batch2.edge_index, batch2.edge_attr, batch2.batch)
+# train_loss = []
+# for epoch in range(args.epoch):  
+#     encoder.train()
+#     total_loss = 0
 
-        z1 = projector(h1)
-        z2 = projector(h2)
+#     for i, (pairs, label) in enumerate(loader):
+#         g1_list = [p[0] for p in pairs]
+#         g2_list = [p[1] for p in pairs]
 
-        loss = contrastive_loss(z1, z2, label)
+#         batch1 = Batch.from_data_list(g1_list).to(device)
+#         batch2 = Batch.from_data_list(g2_list).to(device)
+#         label = label.to(device)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
+#         if args.models == 'GCN':
+#             # GCN
+#             h1 = encoder(batch1.x, batch1.edge_index, batch1.batch)
+#             h2 = encoder(batch2.x, batch2.edge_index, batch2.batch)
+#         elif args.models == 'GINE':
+#             # GINE
+#             h1 = encoder(batch1.x, batch1.edge_index, batch1.edge_attr, batch1.batch)
+#             h2 = encoder(batch2.x, batch2.edge_index, batch2.edge_attr, batch2.batch)
+
+#         z1 = projector(h1)
+#         z2 = projector(h2)
+
+#         loss = contrastive_loss(z1, z2, label)
+
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
+#         total_loss += loss.item()
     
-    train_loss.append(total_loss / len(pairs))
-    print(f"Epoch {epoch+1}: Loss = {total_loss / len(pairs)}")
+#     train_loss.append(total_loss / len(pairs))
+#     print(f"Epoch {epoch+1}: Loss = {total_loss / len(pairs)}")
 
-plot_train_loss(args.epoch, train_loss, args.models)
+# plot_train_loss(args.epoch, train_loss, args.models)
 
-# Save the model
-torch.save(encoder.state_dict(), f'./checkpoints/CL_encoder_{args.models}.pth')
+# # Save the model
+# torch.save(encoder.state_dict(), f'./checkpoints/CL_encoder_{args.models}.pth')

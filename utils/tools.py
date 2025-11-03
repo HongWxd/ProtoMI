@@ -389,27 +389,6 @@ def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     plt.tight_layout()
     plt.savefig(f'./figs/fold_{fold+1}_loss_AUC_curve.png', dpi=600)
 
-def feature_noise(data, noise_level=0.1):
-    x = data.x + noise_level * torch.randn_like(data.x)
-    return Data(x=x, edge_index=data.edge_index, edge_attr=data.edge_attr)
-
-def perturb_edges(data, perturb_ratio=0.1):
-    edge_index = data.edge_index.clone()
-    num_edges = edge_index.size(1)
-    num_nodes = data.n_nodes
-
-    num_delete = int(num_edges * perturb_ratio / 2)
-    mask = torch.ones(num_edges, dtype=torch.bool)
-    del_indices = random.sample(range(num_edges), num_delete)
-    mask[del_indices] = False
-    edge_index = edge_index[:, mask]
-
-    num_add = num_delete
-    new_edges = torch.randint(0, num_nodes, (2, num_add))
-    edge_index = torch.cat([edge_index, new_edges], dim=1)
-
-    data.edge_index = edge_index
-    return data
 
 def plot_train_loss(num_epochs, train_loss, model):
     epochs = list(range(1, num_epochs+1))
@@ -432,3 +411,26 @@ def nnPU_loss(g_p, g_u, prior=0.3, beta=0.1):
     risk = prior * (loss_pos - loss_neg_pos) + loss_neg
     # return torch.where(risk >= 0, risk, -beta * risk)
     return risk
+
+
+def feature_noise(data, noise_level=0.1):
+    x = data.x + noise_level * torch.randn_like(data.x)
+    return Data(x=x, edge_index=data.edge_index, edge_attr=data.edge_attr)
+
+def perturb_edges(data, perturb_ratio=0.1):
+    edge_index = data.edge_index.clone()
+    num_edges = edge_index.size(1)
+    num_nodes = data.n_nodes
+
+    num_delete = int(num_edges * perturb_ratio / 2)
+    mask = torch.ones(num_edges, dtype=torch.bool)
+    del_indices = random.sample(range(num_edges), num_delete)
+    mask[del_indices] = False
+    edge_index = edge_index[:, mask]
+
+    num_add = num_delete
+    new_edges = torch.randint(0, num_nodes, (2, num_add))
+    edge_index = torch.cat([edge_index, new_edges], dim=1)
+
+    data.edge_index = edge_index
+    return data

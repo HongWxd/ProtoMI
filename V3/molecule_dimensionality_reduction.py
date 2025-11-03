@@ -112,7 +112,7 @@ for k in possible_clusters:
         if score > best_score:
             best_score = score
             best_k = k
-            best_labels = cluster_labels
+            best_labels = cluster_labels 
     except Exception as e:
         print(f"k={k} failed: {e}")
 
