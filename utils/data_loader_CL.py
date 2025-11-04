@@ -3,7 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
-from utils.tools import Graph_data_generator, get_statistical_values, feature_noise, perturb_edges
+from utils.tools import Graph_data_generator, get_statistical_values, perturb_edges
 import numpy as np
 import json
 import random

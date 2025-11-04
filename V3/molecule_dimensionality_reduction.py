@@ -69,7 +69,7 @@ print(f"总体稀疏度 (fraction zeros) = {sparsity:.4f}")
 
 # 1️⃣ 计算距离矩阵（建议用 cosine 或 euclidean）
 # dist_matrix = pairwise_distances(fps, metric='euclidean')
-
+print(fps.shape)
 sim_matrix = tanimoto_matrix(fps)
 # 转化为距离矩阵用于降维
 dist_matrix = 1 - sim_matrix

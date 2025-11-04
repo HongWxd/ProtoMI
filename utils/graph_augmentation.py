@@ -246,6 +246,8 @@ class Graph_Augmentation_Helper():
     
 
     def do_augmentation(self):
+        print('Start to augment graph data')
+
         if self.aug_types == 'all':
             # feature-level augmentation
             node_mixup_samples = self.node_feature_shuffle(self.pos_samples, self.shuffle_ratio)

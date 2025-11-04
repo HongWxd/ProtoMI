@@ -390,7 +390,7 @@ def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
     plt.savefig(f'./figs/fold_{fold+1}_loss_AUC_curve.png', dpi=600)
 
 
-def plot_train_loss(num_epochs, train_loss, model):
+def plot_train_loss(num_epochs, train_loss, model, training_types):
     epochs = list(range(1, num_epochs+1))
 
     plt.figure(figsize=(12, 5))
@@ -402,7 +402,7 @@ def plot_train_loss(num_epochs, train_loss, model):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig(f'./figs/{model}_train_loss_curve.png', dpi=600)
+    plt.savefig(f'./figs/{model}_{training_types}_train_loss_curve.png', dpi=600)
 
 def nnPU_loss(g_p, g_u, prior=0.3, beta=0.1):
     loss_pos = F.sigmoid(-g_p).mean()      # ℓ(g,+1)
@@ -413,14 +413,10 @@ def nnPU_loss(g_p, g_u, prior=0.3, beta=0.1):
     return risk
 
 
-def feature_noise(data, noise_level=0.1):
-    x = data.x + noise_level * torch.randn_like(data.x)
-    return Data(x=x, edge_index=data.edge_index, edge_attr=data.edge_attr)
-
-def perturb_edges(data, perturb_ratio=0.1):
+def perturb_edges(data, device, perturb_ratio=0.1):
     edge_index = data.edge_index.clone()
     num_edges = edge_index.size(1)
-    num_nodes = data.n_nodes
+    num_nodes = data.x.size(0)
 
     num_delete = int(num_edges * perturb_ratio / 2)
     mask = torch.ones(num_edges, dtype=torch.bool)
@@ -429,8 +425,30 @@ def perturb_edges(data, perturb_ratio=0.1):
     edge_index = edge_index[:, mask]
 
     num_add = num_delete
-    new_edges = torch.randint(0, num_nodes, (2, num_add))
+    new_edges = torch.randint(0, num_nodes, (2, num_add), device=device)
     edge_index = torch.cat([edge_index, new_edges], dim=1)
 
     data.edge_index = edge_index
     return data
+
+def info_nce_loss(z1, z2, temperature=0.5):
+    """
+    z1, z2: shape [N, d]
+    """
+    z1 = F.normalize(z1, dim=-1)
+    z2 = F.normalize(z2, dim=-1)
+    N = z1.size(0)
+    
+    sim_matrix = torch.mm(z1, z2.t()) / temperature
+    labels = torch.arange(N).to(z1.device)
+    loss = F.cross_entropy(sim_matrix, labels)
+    return loss
+
+
+def tanimoto_matrix(X):
+    intersection = X @ X.T
+    bit_sum = X.sum(axis=1)
+    union = bit_sum[:, None] + bit_sum[None, :] - intersection
+    union = np.where(union == 0, 1, union)
+    sim = intersection / union
+    return sim
