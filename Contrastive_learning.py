@@ -14,15 +14,25 @@ from sklearn.model_selection import KFold
 import numpy as np
 import torch.nn.functional as F
 import warnings
-from torch_geometric.data import Batch
-
-from sklearn.cluster import KMeans, DBSCAN
 import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
-from sklearn.metrics import pairwise_distances
 from sklearn.metrics import silhouette_score
-from rdkit import DataStructs
-
+import json
+from rdkit.Chem import rdFingerprintGenerator
+from rdkit.Chem import DataStructs
+from rdkit import Chem
+from scipy.stats import spearmanr, pearsonr
+from sklearn.metrics import (
+    adjusted_rand_score, 
+    normalized_mutual_info_score, 
+    adjusted_mutual_info_score, 
+    fowlkes_mallows_score,
+    v_measure_score,
+    homogeneity_score,
+    completeness_score
+)
+from scipy.spatial.distance import pdist, squareform
+from scipy.stats import spearmanr
 
 warnings.filterwarnings('ignore')
 
@@ -144,41 +154,85 @@ def main():
     # get the original cluster in the positive samples
     model.eval()
     projection_head = ProjectionHead(in_dim=args.hidden_channels).to(device)
-    pos_aug_loader = DataLoader(pos_aug_samples, batch_size=args.batch_size, shuffle=False)
+    pos_aug_loader = DataLoader(pos_train_samples, batch_size=args.batch_size, shuffle=False)
 
     all_embeddings = []
+    additives_names = []
     with torch.no_grad():
         for data in pos_aug_loader:
             data = data.to(device)
             out = model(data.x, data.edge_index, data.edge_attr, data.batch)
             emb = projection_head(out)
             all_embeddings.append(emb.cpu())
+            additives_names += data.id
 
     all_embeddings = torch.cat(all_embeddings, dim=0).numpy()  # shape: [num_molecules, hidden_dim]
-    print(all_embeddings.shape)
-
-    sim_matrix = tanimoto_matrix(all_embeddings)
-    # 转化为距离矩阵用于降维
-    dist_matrix = 1 - sim_matrix
-    np.fill_diagonal(dist_matrix, 0)  # 对角线必须为 0
 
     reducer_2d = umap.UMAP(random_state=42)
-    embeddings = reducer_2d.fit_transform(dist_matrix)
+    embeddings = reducer_2d.fit_transform(all_embeddings)
 
     # 2️⃣ 进行层次聚类 (ward/linkage 可换成 'average'、'complete')
-    Z = linkage(dist_matrix, method='ward')
-    additives_names = range(len(all_embeddings))
+    Z = linkage(all_embeddings, method='ward', metric='euclidean')
+    with open('./V3/processed_data/additives.json', "r", encoding="utf-8") as f:
+        additives_data = json.load(f)
+
+    # smiles_list = [additives_data[i]['smiles'] for i in additives_names]
+    # morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+    # fps = []
+    # valid_smiles = []
+    # for smi in tqdm(smiles_list):
+    #     mol = Chem.MolFromSmiles(smi)
+    #     if mol:
+    #         fp = morgan_gen.GetFingerprint(mol)  
+    #         arr = np.zeros((1,))
+    #         DataStructs.ConvertToNumpyArray(fp, arr)
+    #         fps.append(arr)
+    #         valid_smiles.append(smi)
+    # fps = np.array(fps)
+
+    # Z_fp = linkage(fps, method='ward')
+    # Z_gnn = linkage(embeddings, method='ward')
+
+    # # ============ 2. 固定聚成10个簇 ============
+    # labels_fp = fcluster(Z_fp, t=10, criterion='maxclust')
+    # labels_gnn = fcluster(Z_gnn, t=10, criterion='maxclust')
+
+    # # ============ 3. 多种一致性指标 ============
+    # ari = adjusted_rand_score(labels_fp, labels_gnn)
+    # nmi = normalized_mutual_info_score(labels_fp, labels_gnn)
+    # ami = adjusted_mutual_info_score(labels_fp, labels_gnn)
+    # fmi = fowlkes_mallows_score(labels_fp, labels_gnn)
+    # v_measure = v_measure_score(labels_fp, labels_gnn)
+    # homogeneity = homogeneity_score(labels_fp, labels_gnn)
+    # completeness = completeness_score(labels_fp, labels_gnn)
+
+    # # ============ 4. 计算几何结构一致性（Spearman相关） ============
+    # dist_fp = squareform(pdist(fps, metric='euclidean'))
+    # dist_gnn = squareform(pdist(embeddings, metric='euclidean'))
+    # spearman_corr, _ = spearmanr(dist_fp.ravel(), dist_gnn.ravel())
+
+    # # ============ 5. 打印结果 ============
+    # print("==== 聚类一致性指标 ====")
+    # print(f"ARI:          {ari:.4f}")
+    # print(f"NMI:          {nmi:.4f}")
+    # print(f"AMI:          {ami:.4f}")
+    # print(f"FMI:          {fmi:.4f}")
+    # print(f"V-Measure:    {v_measure:.4f}")
+    # print(f"Homogeneity:  {homogeneity:.4f}")
+    # print(f"Completeness: {completeness:.4f}")
+    # print(f"Spearman Corr (Distance Structure): {spearman_corr:.4f}")
+    
     # 3️⃣ 画树状图
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(20, 18))
     dendrogram(Z, labels=additives_names, leaf_rotation=90)
-    plt.title("Hierarchical Clustering of Additives (126 positive samples)")
-    plt.xlabel("Additive")
+    plt.title("Hierarchical Clustering of Samples")
+    plt.xlabel("Samples")
     plt.ylabel("Distance")
     plt.tight_layout()
-    plt.savefig("./V3/plots/additives_hierarchical_clustering.png", dpi=600)
+    plt.savefig("./V3/plots/positive_samples_hierarchical_clustering.png", dpi=600)
 
 
-    possible_clusters = range(2, 11)  # 尝试从2到10个簇
+    possible_clusters = range(3, 11)
     best_score = -1
     best_k = None
     best_labels = None
@@ -186,7 +240,7 @@ def main():
     for k in possible_clusters:
         cluster_labels = fcluster(Z, t=k, criterion='maxclust')
         try:
-            score = silhouette_score(dist_matrix, cluster_labels, metric='precomputed')
+            score = silhouette_score(all_embeddings, cluster_labels, metric='euclidean')
             print(f"k={k}, silhouette score={score:.4f}")
             if score > best_score:
                 best_score = score
@@ -200,13 +254,13 @@ def main():
     # 可视化不同簇在UMAP上的分布
     plt.figure(figsize=(8,6))
     for i in range(1, best_k+1):
-        plt.scatter(all_embeddings[best_labels==i, 0], all_embeddings[best_labels==i, 1], s=40, label=f"Cluster {i}", alpha=0.7)
+        plt.scatter(embeddings[best_labels==i, 0], embeddings[best_labels==i, 1], s=40, label=f"Cluster {i}", alpha=0.7)
     plt.legend()
     plt.title(f"UMAP Projection (Best Clusters = {best_k})")
     plt.xlabel("UMAP-1")
     plt.ylabel("UMAP-2")
     plt.tight_layout()
-    plt.savefig("./V3/plots/additives_umap_best_cluster.png", dpi=600)
+    plt.savefig("./V3/plots/positive_samples_umap_best_cluster.png", dpi=600)
 
 
 if __name__=="__main__":
