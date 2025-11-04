@@ -154,7 +154,7 @@ def main():
     # get the original cluster in the positive samples
     model.eval()
     projection_head = ProjectionHead(in_dim=args.hidden_channels).to(device)
-    pos_aug_loader = DataLoader(pos_train_samples, batch_size=args.batch_size, shuffle=False)
+    pos_aug_loader = DataLoader(positive_samples, batch_size=args.batch_size, shuffle=False)
 
     all_embeddings = []
     additives_names = []
@@ -176,54 +176,54 @@ def main():
     with open('./V3/processed_data/additives.json', "r", encoding="utf-8") as f:
         additives_data = json.load(f)
 
-    # smiles_list = [additives_data[i]['smiles'] for i in additives_names]
-    # morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
-    # fps = []
-    # valid_smiles = []
-    # for smi in tqdm(smiles_list):
-    #     mol = Chem.MolFromSmiles(smi)
-    #     if mol:
-    #         fp = morgan_gen.GetFingerprint(mol)  
-    #         arr = np.zeros((1,))
-    #         DataStructs.ConvertToNumpyArray(fp, arr)
-    #         fps.append(arr)
-    #         valid_smiles.append(smi)
-    # fps = np.array(fps)
+    smiles_list = [additives_data[i]['smiles'] for i in additives_names]
+    morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+    fps = []
+    valid_smiles = []
+    for smi in tqdm(smiles_list):
+        mol = Chem.MolFromSmiles(smi)
+        if mol:
+            fp = morgan_gen.GetFingerprint(mol)  
+            arr = np.zeros((1,))
+            DataStructs.ConvertToNumpyArray(fp, arr)
+            fps.append(arr)
+            valid_smiles.append(smi)
+    fps = np.array(fps)
 
-    # Z_fp = linkage(fps, method='ward')
-    # Z_gnn = linkage(embeddings, method='ward')
+    Z_fp = linkage(fps, method='ward')
+    Z_gnn = linkage(embeddings, method='ward')
 
-    # # ============ 2. 固定聚成10个簇 ============
-    # labels_fp = fcluster(Z_fp, t=10, criterion='maxclust')
-    # labels_gnn = fcluster(Z_gnn, t=10, criterion='maxclust')
+    # ============ 2. 固定聚成10个簇 ============
+    labels_fp = fcluster(Z_fp, t=10, criterion='maxclust')
+    labels_gnn = fcluster(Z_gnn, t=10, criterion='maxclust')
 
-    # # ============ 3. 多种一致性指标 ============
-    # ari = adjusted_rand_score(labels_fp, labels_gnn)
-    # nmi = normalized_mutual_info_score(labels_fp, labels_gnn)
-    # ami = adjusted_mutual_info_score(labels_fp, labels_gnn)
-    # fmi = fowlkes_mallows_score(labels_fp, labels_gnn)
-    # v_measure = v_measure_score(labels_fp, labels_gnn)
-    # homogeneity = homogeneity_score(labels_fp, labels_gnn)
-    # completeness = completeness_score(labels_fp, labels_gnn)
+    # ============ 3. 多种一致性指标 ============
+    ari = adjusted_rand_score(labels_fp, labels_gnn)
+    nmi = normalized_mutual_info_score(labels_fp, labels_gnn)
+    ami = adjusted_mutual_info_score(labels_fp, labels_gnn)
+    fmi = fowlkes_mallows_score(labels_fp, labels_gnn)
+    v_measure = v_measure_score(labels_fp, labels_gnn)
+    homogeneity = homogeneity_score(labels_fp, labels_gnn)
+    completeness = completeness_score(labels_fp, labels_gnn)
 
-    # # ============ 4. 计算几何结构一致性（Spearman相关） ============
-    # dist_fp = squareform(pdist(fps, metric='euclidean'))
-    # dist_gnn = squareform(pdist(embeddings, metric='euclidean'))
-    # spearman_corr, _ = spearmanr(dist_fp.ravel(), dist_gnn.ravel())
+    # ============ 4. 计算几何结构一致性（Spearman相关） ============
+    dist_fp = squareform(pdist(fps, metric='euclidean'))
+    dist_gnn = squareform(pdist(embeddings, metric='euclidean'))
+    spearman_corr, _ = spearmanr(dist_fp.ravel(), dist_gnn.ravel())
 
-    # # ============ 5. 打印结果 ============
-    # print("==== 聚类一致性指标 ====")
-    # print(f"ARI:          {ari:.4f}")
-    # print(f"NMI:          {nmi:.4f}")
-    # print(f"AMI:          {ami:.4f}")
-    # print(f"FMI:          {fmi:.4f}")
-    # print(f"V-Measure:    {v_measure:.4f}")
-    # print(f"Homogeneity:  {homogeneity:.4f}")
-    # print(f"Completeness: {completeness:.4f}")
-    # print(f"Spearman Corr (Distance Structure): {spearman_corr:.4f}")
+    # ============ 5. 打印结果 ============
+    print("==== 聚类一致性指标 ====")
+    print(f"ARI:          {ari:.4f}")
+    print(f"NMI:          {nmi:.4f}")
+    print(f"AMI:          {ami:.4f}")
+    print(f"FMI:          {fmi:.4f}")
+    print(f"V-Measure:    {v_measure:.4f}")
+    print(f"Homogeneity:  {homogeneity:.4f}")
+    print(f"Completeness: {completeness:.4f}")
+    print(f"Spearman Corr (Distance Structure): {spearman_corr:.4f}")
     
     # 3️⃣ 画树状图
-    plt.figure(figsize=(20, 18))
+    plt.figure(figsize=(10, 8))
     dendrogram(Z, labels=additives_names, leaf_rotation=90)
     plt.title("Hierarchical Clustering of Samples")
     plt.xlabel("Samples")
