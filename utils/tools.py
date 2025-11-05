@@ -16,6 +16,8 @@ import matminer.featurizers.composition as mm_composition
 import matminer.featurizers.structure as mm_structure
 from pymatgen.core import Composition
 from torch_geometric.utils import subgraph
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+from sklearn.metrics import silhouette_score
 
 
 
@@ -404,14 +406,6 @@ def plot_train_loss(num_epochs, train_loss, model, training_types):
     plt.tight_layout()
     plt.savefig(f'./figs/{model}_{training_types}_train_loss_curve.png', dpi=600)
 
-def nnPU_loss(g_p, g_u, prior=0.3, beta=0.1):
-    loss_pos = F.sigmoid(-g_p).mean()      # ℓ(g,+1)
-    loss_neg = F.sigmoid(g_u).mean()       # ℓ(g,-1)
-    loss_neg_pos = F.sigmoid(g_p).mean()   # ℓ(g,-1) on positive samples
-    risk = prior * (loss_pos - loss_neg_pos) + loss_neg
-    # return torch.where(risk >= 0, risk, -beta * risk)
-    return risk
-
 
 def perturb_edges(data, device, perturb_ratio=0.1):
     edge_index = data.edge_index.clone()
@@ -452,3 +446,25 @@ def tanimoto_matrix(X):
     union = np.where(union == 0, 1, union)
     sim = intersection / union
     return sim
+
+def try_multiple_cluster_combinations(Z, all_embeddings, args):
+    possible_clusters = range(3, args.max_cluster+1)
+    best_score = -1
+    best_k = None
+    best_labels = None
+
+    for k in possible_clusters:
+        cluster_labels = fcluster(Z, t=k, criterion='maxclust')
+        try:
+            score = silhouette_score(all_embeddings, cluster_labels, metric='euclidean')
+            print(f"k={k}, silhouette score={score:.4f}")
+            if score > best_score:
+                best_score = score
+                best_k = k
+                best_labels = cluster_labels 
+        except Exception as e:
+            print(f"k={k} failed: {e}")
+
+    print(f"\n✅ best cluster number: {best_k}, average silhouette score: {best_score:.4f}")
+
+    return best_k, best_labels

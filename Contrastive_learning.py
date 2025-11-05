@@ -8,36 +8,23 @@ from tqdm import tqdm
 import time
 import umap
 import pickle
-from utils.tools import plot_train_loss, perturb_edges, info_nce_loss, tanimoto_matrix
+from utils.tools import plot_train_loss, perturb_edges, info_nce_loss, try_multiple_cluster_combinations
 from utils.graph_augmentation import Graph_Augmentation_Helper
+from utils.visualization import show_gnn_fp_consistency_results, plot_hierarchical_cluster_dendrogram, plot_cluster_distribution_UMAP
 from sklearn.model_selection import KFold
 import numpy as np
 import torch.nn.functional as F
 import warnings
 import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
-from sklearn.metrics import silhouette_score
-import json
-from rdkit.Chem import rdFingerprintGenerator
-from rdkit.Chem import DataStructs
-from rdkit import Chem
-from scipy.stats import spearmanr, pearsonr
-from sklearn.metrics import (
-    adjusted_rand_score, 
-    normalized_mutual_info_score, 
-    adjusted_mutual_info_score, 
-    fowlkes_mallows_score,
-    v_measure_score,
-    homogeneity_score,
-    completeness_score
-)
-from scipy.spatial.distance import pdist, squareform
-from scipy.stats import spearmanr
+from scipy.spatial.distance import cdist
+from sklearn.model_selection import train_test_split
+
 
 warnings.filterwarnings('ignore')
 
 # unsupervised learning configs
-parser = argparse.ArgumentParser(description="Train a GCN model")
+parser = argparse.ArgumentParser(description="Train the model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
@@ -66,6 +53,12 @@ parser.add_argument('--K', type=int, default=10, help='PPR K')
 parser.add_argument('--random_state', type=int, default=42, help='data split random seed')
 parser.add_argument('--test_size', type=float, default=0.2, help='test set size')
 
+# prototypes configs
+parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
+parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
+
+# main configs
+parser.add_argument('--task', type=str, default='train', help='task types')
 
 args = parser.parse_args()
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
@@ -125,7 +118,8 @@ def load_data(data_path):
     unlabeled_samples = all_data[126:]
     graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
     pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()
-    return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples
+    unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
+    return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples
 
 
 def get_representation_model(file_path, pos_train_samples, pos_test_samples):
@@ -140,127 +134,121 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     return model
 
 
+def get_prototypes(model, pos_samples, unlabeled_samples):
+    # get the original cluster in the positive samples
+    model.eval()
+    projection_head = ProjectionHead(in_dim=args.hidden_channels).to(device)
+    pos_sample_loader = DataLoader(pos_samples, batch_size=args.batch_size, shuffle=False)
+    unl_sample_loader = DataLoader(unlabeled_samples, batch_size=args.batch_size, shuffle=False)
+
+    pos_graph_embeddings = []
+    pos_additives_names = []
+    unl_graph_embeddings = []
+    unl_additives_names = []
+    with torch.no_grad():
+        for data in pos_sample_loader:
+            pos_additives_names += data.id
+            data = data.to(device)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            emb = projection_head(out)
+            pos_graph_embeddings.append(emb.cpu())
+            
+        
+        for data in unl_sample_loader:
+            unl_additives_names += data.id
+            data = data.to(device)
+            out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+            emb = projection_head(out)
+            unl_graph_embeddings.append(emb.cpu())
+            
+
+    pos_graph_embeddings = torch.cat(pos_graph_embeddings, dim=0).numpy()  # shape: [num_molecules, hidden_dim]
+    unl_graph_embeddings = torch.cat(unl_graph_embeddings, dim=0).numpy()
+
+    reducer_2d = umap.UMAP(random_state=42)
+    umap_embeddings = reducer_2d.fit_transform(pos_graph_embeddings)
+
+    # hierarchical cluster
+    Z = linkage(pos_graph_embeddings, method='ward', metric='euclidean')
+
+    # get the best cluster number of all positive samples
+    best_cluster_num, labels = try_multiple_cluster_combinations(Z, pos_graph_embeddings, args)
+    
+    # # plot hierarchical cluster dendrogram
+    # plot_hierarchical_cluster_dendrogram(Z, pos_additives_names)
+    # # plot UMAP cluster distribution
+    # plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings)
+    # # show the consistency analysis results
+    # if args.task == 'eval':
+    #     show_gnn_fp_consistency_results(pos_additives_names, umap_embeddings)
+
+    # get the positive samples prototypes
+    proto_centroids = []
+    unique_labels = np.unique(labels)
+    for label in unique_labels:
+        cluster_points = pos_graph_embeddings[labels == label]
+        centroid = np.mean(cluster_points, axis=0)
+        proto_centroids.append(centroid)
+    
+    proto_centroids = np.array(proto_centroids)
+    
+    dist_matrix = cdist(unl_graph_embeddings, proto_centroids, metric='euclidean')  # shape: (180000, 10)
+    closest_proto = np.argmin(dist_matrix, axis=1)
+    closest_proto += 1
+
+    # get unlabeled samples prototypes
+    all_graph_embeddings = np.vstack([pos_graph_embeddings, unl_graph_embeddings])
+    all_prototypes = np.concatenate([np.array(labels), closest_proto])
+    densities = []
+    for label in unique_labels:
+        select_embeddings = all_graph_embeddings[all_prototypes == label]
+        centroid = proto_centroids[unique_labels == label]
+
+        distances = cdist(select_embeddings, centroid.reshape(1, -1), metric='euclidean')
+        d = (np.sqrt(distances).mean()) / np.log(len(select_embeddings) + 10)
+        densities.append(d)
+    
+    # clamp extreme values for stability
+    low, high = np.percentile(densities, 10), np.percentile(densities, 90)
+    densities = np.clip(densities, low, high)
+
+    # === scale the mean to temperature  ===
+    densities = args.temperature * densities / densities.mean()
+    densities = np.array(densities)
+    samples_densities = np.array([densities[unique_labels == label].item() for label in all_prototypes])
+    molecules_id = pos_additives_names + unl_additives_names
+
+    prototypes_table = pd.DataFrame()
+    prototypes_table['molecule_id'] = molecules_id
+    prototypes_table['prototypes'] = all_prototypes
+    prototypes_table['density'] = samples_densities
+
+    return prototypes_table
+
+    print(prototypes_table)
+
+
 def main():
     data_path = './data/all_data.pkl'
     file_path = f"./checkpoints/{args.training_types}_model_{args.models}.pth"
 
     # load data
-    positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples = load_data(data_path)
-    pos_aug_samples = pos_train_samples + pos_test_samples
+    positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
+    all_pos_samples = pos_train_samples + pos_test_samples
 
     # check and get the representation model checkpoint
     model = get_representation_model(file_path, pos_train_samples, pos_test_samples)
 
-    # get the original cluster in the positive samples
-    model.eval()
-    projection_head = ProjectionHead(in_dim=args.hidden_channels).to(device)
-    pos_aug_loader = DataLoader(positive_samples, batch_size=args.batch_size, shuffle=False)
+    # get the prototypes table
+    if args.task == 'train':
+        prototypes_table = get_prototypes(model, pos_train_samples, unl_train_samples) # get the prototypes during training process
+    elif args.task == 'test':
+        get_prototypes(model, pos_test_samples, unl_test_samples) # get the prototypes during test process
+    elif args.task == 'eval':
+        get_prototypes(model, positive_samples, unlabeled_samples) # get the prototypes of all positive samples to analysis the model performance
 
-    all_embeddings = []
-    additives_names = []
-    with torch.no_grad():
-        for data in pos_aug_loader:
-            data = data.to(device)
-            out = model(data.x, data.edge_index, data.edge_attr, data.batch)
-            emb = projection_head(out)
-            all_embeddings.append(emb.cpu())
-            additives_names += data.id
-
-    all_embeddings = torch.cat(all_embeddings, dim=0).numpy()  # shape: [num_molecules, hidden_dim]
-
-    reducer_2d = umap.UMAP(random_state=42)
-    embeddings = reducer_2d.fit_transform(all_embeddings)
-
-    # 2️⃣ 进行层次聚类 (ward/linkage 可换成 'average'、'complete')
-    Z = linkage(all_embeddings, method='ward', metric='euclidean')
-    with open('./V3/processed_data/additives.json', "r", encoding="utf-8") as f:
-        additives_data = json.load(f)
-
-    smiles_list = [additives_data[i]['smiles'] for i in additives_names]
-    morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
-    fps = []
-    valid_smiles = []
-    for smi in tqdm(smiles_list):
-        mol = Chem.MolFromSmiles(smi)
-        if mol:
-            fp = morgan_gen.GetFingerprint(mol)  
-            arr = np.zeros((1,))
-            DataStructs.ConvertToNumpyArray(fp, arr)
-            fps.append(arr)
-            valid_smiles.append(smi)
-    fps = np.array(fps)
-
-    Z_fp = linkage(fps, method='ward')
-    Z_gnn = linkage(embeddings, method='ward')
-
-    # ============ 2. 固定聚成10个簇 ============
-    labels_fp = fcluster(Z_fp, t=10, criterion='maxclust')
-    labels_gnn = fcluster(Z_gnn, t=10, criterion='maxclust')
-
-    # ============ 3. 多种一致性指标 ============
-    ari = adjusted_rand_score(labels_fp, labels_gnn)
-    nmi = normalized_mutual_info_score(labels_fp, labels_gnn)
-    ami = adjusted_mutual_info_score(labels_fp, labels_gnn)
-    fmi = fowlkes_mallows_score(labels_fp, labels_gnn)
-    v_measure = v_measure_score(labels_fp, labels_gnn)
-    homogeneity = homogeneity_score(labels_fp, labels_gnn)
-    completeness = completeness_score(labels_fp, labels_gnn)
-
-    # ============ 4. 计算几何结构一致性（Spearman相关） ============
-    dist_fp = squareform(pdist(fps, metric='euclidean'))
-    dist_gnn = squareform(pdist(embeddings, metric='euclidean'))
-    spearman_corr, _ = spearmanr(dist_fp.ravel(), dist_gnn.ravel())
-
-    # ============ 5. 打印结果 ============
-    print("==== 聚类一致性指标 ====")
-    print(f"ARI:          {ari:.4f}")
-    print(f"NMI:          {nmi:.4f}")
-    print(f"AMI:          {ami:.4f}")
-    print(f"FMI:          {fmi:.4f}")
-    print(f"V-Measure:    {v_measure:.4f}")
-    print(f"Homogeneity:  {homogeneity:.4f}")
-    print(f"Completeness: {completeness:.4f}")
-    print(f"Spearman Corr (Distance Structure): {spearman_corr:.4f}")
     
-    # 3️⃣ 画树状图
-    plt.figure(figsize=(10, 8))
-    dendrogram(Z, labels=additives_names, leaf_rotation=90)
-    plt.title("Hierarchical Clustering of Samples")
-    plt.xlabel("Samples")
-    plt.ylabel("Distance")
-    plt.tight_layout()
-    plt.savefig("./V3/plots/positive_samples_hierarchical_clustering.png", dpi=600)
 
-
-    possible_clusters = range(3, 11)
-    best_score = -1
-    best_k = None
-    best_labels = None
-
-    for k in possible_clusters:
-        cluster_labels = fcluster(Z, t=k, criterion='maxclust')
-        try:
-            score = silhouette_score(all_embeddings, cluster_labels, metric='euclidean')
-            print(f"k={k}, silhouette score={score:.4f}")
-            if score > best_score:
-                best_score = score
-                best_k = k
-                best_labels = cluster_labels 
-        except Exception as e:
-            print(f"k={k} failed: {e}")
-
-    print(f"\n✅ 最佳簇数: {best_k}, 对应的平均轮廓系数: {best_score:.4f}")
-
-    # 可视化不同簇在UMAP上的分布
-    plt.figure(figsize=(8,6))
-    for i in range(1, best_k+1):
-        plt.scatter(embeddings[best_labels==i, 0], embeddings[best_labels==i, 1], s=40, label=f"Cluster {i}", alpha=0.7)
-    plt.legend()
-    plt.title(f"UMAP Projection (Best Clusters = {best_k})")
-    plt.xlabel("UMAP-1")
-    plt.ylabel("UMAP-2")
-    plt.tight_layout()
-    plt.savefig("./V3/plots/positive_samples_umap_best_cluster.png", dpi=600)
 
 
 if __name__=="__main__":
