@@ -42,7 +42,7 @@ class Graph_Augmentation_Helper():
 
             new_data = data.clone()
             new_data.x = shuffled_x
-            new_data.id = str(data.id) + '_NFS'
+            new_data.id = int(str(data.id) + '000')
             shuffled_samples.append(new_data)
 
         return shuffled_samples
@@ -60,7 +60,7 @@ class Graph_Augmentation_Helper():
 
             new_data = data.clone()
             new_data.x = x_noisy
-            new_data.id = str(data.id) + '_NFNM'
+            new_data.id = int(str(data.id) + '001')
             noise_masked_samples.append(new_data)
         
         return noise_masked_samples
@@ -94,7 +94,7 @@ class Graph_Augmentation_Helper():
             new_data.edge_index = edge_index
             new_data.edge_attr = edge_attr
             new_data.n_nodes = keep_nodes.size(0)
-            new_data.id = str(data.id) + '_ND'
+            new_data.id = int(str(data.id) + '010')
             dropped_samples.append(new_data)
         
         return dropped_samples
@@ -169,7 +169,7 @@ class Graph_Augmentation_Helper():
             new_data.edge_index = new_edge_index.edge_index
             if hasattr(data, 'edge_attr'):
                 new_data.edge_attr = torch.zeros((new_data.edge_index.size(1), data.edge_attr.size(1)))
-            new_data.id = str(data.id) + '_EPW'
+            new_data.id = int(str(data.id) + '011')
             
             edge_perturbation_weighted_samples.append(new_data)
 
@@ -244,7 +244,7 @@ class Graph_Augmentation_Helper():
             new_data.edge_index = new_edge_index
             new_data.n_edges = new_edge_index.size(1)
             new_data.edge_attr = data.edge_attr[:new_edge_index.size(1)]  # 直接截断（或重新初始化）
-            new_data.id = str(data.id) + '_PPR'
+            new_data.id = int(str(data.id) + '100')
 
             PPR_samples.append(new_data)
 

@@ -457,7 +457,7 @@ def try_multiple_cluster_combinations(Z, all_embeddings, args):
         cluster_labels = fcluster(Z, t=k, criterion='maxclust')
         try:
             score = silhouette_score(all_embeddings, cluster_labels, metric='euclidean')
-            print(f"k={k}, silhouette score={score:.4f}")
+            # print(f"k={k}, silhouette score={score:.4f}")
             if score > best_score:
                 best_score = score
                 best_k = k
