@@ -404,7 +404,7 @@ def plot_train_loss(num_epochs, train_loss, model, training_types):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig(f'./figs/{model}_{training_types}_train_loss_curve.png', dpi=600)
+    plt.savefig(f'./figs/{model}_{training_types}_train_loss_curve_{num_epochs}.png', dpi=600)
 
 
 def perturb_edges(data, device, perturb_ratio=0.1):

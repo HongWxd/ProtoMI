@@ -27,7 +27,7 @@ warnings.filterwarnings('ignore')
 # unsupervised learning configs
 parser = argparse.ArgumentParser(description="Train the model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
-parser.add_argument('--batch_size', type=int, default=8192, help='Batch size for training')
+parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for training')
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate')
 parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
@@ -58,7 +58,7 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
 parser.add_argument('--proto_epoch', type=int, default=500, help='Number of training epochs')
-parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
+parser.add_argument('--r', type=int, default=1000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
 
@@ -68,7 +68,7 @@ parser.add_argument('--proto_models', type=str, default='GINE', help='model name
 parser.add_argument('--task', type=str, default='train', help='task types')
 
 args = parser.parse_args()
-device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
 
 def unsupervised_training(pos_train_samples, pos_test_samples):
@@ -279,7 +279,7 @@ def main():
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
     projection = ProjectionHead(in_dim=args.hidden_channels).to(device)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learning_rate, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss()
     encoder.train()
     proto_train_loss = []
