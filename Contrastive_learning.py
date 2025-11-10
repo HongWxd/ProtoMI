@@ -58,17 +58,17 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
 parser.add_argument('--proto_epoch', type=int, default=50, help='Number of training epochs')
-parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
+parser.add_argument('--r', type=int, default=10, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
-parser.add_argument('--pcl_hidden_channels', type=int, default=128, help='Number of hidden channels')
+parser.add_argument('--pcl_hidden_channels', type=int, default=256, help='Number of hidden channels')
 
 
 # main configs
 parser.add_argument('--task', type=str, default='train', help='task types')
 
 args = parser.parse_args()
-device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 
 def unsupervised_training(pos_train_samples, pos_test_samples):
@@ -240,10 +240,11 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     return prototypes_table, prototypes_emb
 
 
-def prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion):
+def prototype_contrastive_training(epoch, model, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion):
     id2idx = {pid.item(): idx for idx, pid in enumerate(molecule_id)}
     encoder.train()
     epoch_train_loss = 0
+    total_samples = 0
     for i, data in enumerate(proto_train_loader):
         # get the neg prototypes id
         neg_proto_id_all = list(set(id2idx.keys()) - set(data.id.tolist()))
@@ -260,8 +261,18 @@ def prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_
 
         proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0) # [pos_n + neg_n, D]
 
+
         query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
+        # output = model(data.x, data.edge_index, data.edge_attr, data.batch)
+
+        # emb1 = F.normalize(query, dim=-1)
+        # emb2 = F.normalize(output, dim=-1)
+        # cosine = F.cosine_similarity(emb1, emb2, dim=1)
+        # print("mean cosine encoder1 vs encoder2:", cosine.mean().item())
+        # print("std cosine:", cosine.std().item())
+
         query = projection(query)
+        
 
         logits_proto = torch.mm(query, proto_selected.t())
         labels_proto = torch.arange(len(pos_indices), dtype=torch.long).to(device)
@@ -278,11 +289,12 @@ def prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_
         loss.backward()
         optimizer.step()
         epoch_train_loss += loss.item()
+        total_samples += len(data)
 
-    avg_epoch_train_loss = epoch_train_loss / len(proto_train_loader)
+    avg_epoch_train_loss = epoch_train_loss / total_samples
     print(f"Epoch [{epoch}/{args.proto_epoch}]  Loss: {avg_epoch_train_loss}")
 
-    return encoder, avg_epoch_train_loss
+    return encoder, projection, avg_epoch_train_loss
 
 
 def main():
@@ -317,7 +329,7 @@ def main():
         hidden_channels=args.pcl_hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
     projection = ProjectionHead(in_dim=args.pcl_hidden_channels).to(device)
-    optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learning_rate, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projection.parameters()), lr=args.learning_rate, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss()
 
     prototype_embeddings = prototype_embeddings.to(device)
@@ -326,11 +338,12 @@ def main():
     proto_train_loss = []
     for epoch in tqdm(range(1, args.proto_epoch + 1), desc='Training the prototype contrastive learning model...'):
         # training
-        encoder, avg_epoch_train_loss = prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion)
+        encoder, projection, avg_epoch_train_loss = prototype_contrastive_training(epoch, model, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion)
         proto_train_loss.append(avg_epoch_train_loss)
 
         # evaluating
         encoder.eval()
+        projection.eval()
         top1_correct = 0
         top5_correct = 0
         total_samples = 0
@@ -345,7 +358,7 @@ def main():
                 query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
                 query = projection(query)
 
-                # 获取正样本 prototype embeddings
+
                 pos_indices = [id2idx[id.item()] for id in data.id]
                 pos_prototypes = prototype_embeddings[pos_indices]
 
@@ -355,7 +368,7 @@ def main():
                 neg_indices = [id2idx[id.item()] for id in neg_proto_id]
                 neg_prototypes = prototype_embeddings[neg_indices]
 
-                # 合并正负样本
+
                 proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0)
 
                 # logits
@@ -377,10 +390,10 @@ def main():
                 # ===== Top-k Evaluation =====
                 _, topk_indices = torch.topk(logits_proto, k=5, dim=1)
                 top1_correct += (topk_indices[:, 0] == labels_proto).sum().item()
-                top5_correct += sum([labels_proto[i].item() in topk_indices[i].tolist() for i in range(len(labels_proto))])
-                total_samples += len(proto_test_loader)
+                top5_correct += (topk_indices == labels_proto.unsqueeze(1)).any(dim=1).sum().item()
+                total_samples += len(data)
 
-        # 输出
+
         avg_loss = total_loss / total_samples
         top1_acc = top1_correct / total_samples
         top5_acc = top5_correct / total_samples
