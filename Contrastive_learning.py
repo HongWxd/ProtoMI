@@ -29,8 +29,8 @@ parser = argparse.ArgumentParser(description="Train the model")
 parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
 parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for training')
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
-parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate')
-parser.add_argument('--hidden_channels', type=int, default=256, help='Number of hidden channels')
+parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
+parser.add_argument('--usl_hidden_channels', type=int, default=256, help='Number of hidden channels')
 parser.add_argument('--epoch', type=int, default=1500, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--training_types', type=str, default='Unsupervised learning', help='training_types')
@@ -57,11 +57,11 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 # prototypes configs
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
-parser.add_argument('--proto_epoch', type=int, default=500, help='Number of training epochs')
-parser.add_argument('--r', type=int, default=1000, help='number of randomly select neg prototypes')
+parser.add_argument('--proto_epoch', type=int, default=50, help='Number of training epochs')
+parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
-
+parser.add_argument('--pcl_hidden_channels', type=int, default=128, help='Number of hidden channels')
 
 
 # main configs
@@ -77,10 +77,10 @@ def unsupervised_training(pos_train_samples, pos_test_samples):
     pos_train_samples = pos_train_samples + pos_test_samples
     train_loader = DataLoader(pos_train_samples, batch_size=args.batch_size, shuffle=True)
     model = Cluster_GINE(num_node_features=pos_train_samples[0].n_node_features, num_edge_features=pos_train_samples[0].n_edge_features, 
-            hidden_channels=args.hidden_channels,
+            hidden_channels=args.usl_hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-    projection_head1 = ProjectionHead(in_dim=args.hidden_channels).to(device)
-    projection_head2 = ProjectionHead(in_dim=args.hidden_channels).to(device)
+    projection_head1 = ProjectionHead(in_dim=args.usl_hidden_channels).to(device)
+    projection_head2 = ProjectionHead(in_dim=args.usl_hidden_channels).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=5e-4)
     model.train()
@@ -123,6 +123,7 @@ def load_data(data_path):
 
     positive_samples = all_data[:126] # number of positive samples
     unlabeled_samples = all_data[126:]
+
     graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
     pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()
     unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
@@ -132,7 +133,7 @@ def load_data(data_path):
 def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     if os.path.exists(file_path):
             model = Cluster_GINE(num_node_features=pos_train_samples[0].n_node_features, num_edge_features=pos_train_samples[0].n_edge_features, 
-                hidden_channels=args.hidden_channels,
+                hidden_channels=args.usl_hidden_channels,
                 num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
             model.load_state_dict(torch.load(file_path)) # load the checkpoints
     else:
@@ -144,7 +145,7 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
 def get_prototypes(model, pos_samples, unlabeled_samples):
     # get the original cluster in the positive samples
     model.eval()
-    projection_head = ProjectionHead(in_dim=args.hidden_channels).to(device)
+    projection_head = ProjectionHead(in_dim=args.usl_hidden_channels).to(device)
     pos_sample_loader = DataLoader(pos_samples, batch_size=args.batch_size, shuffle=False)
     unl_sample_loader = DataLoader(unlabeled_samples, batch_size=args.batch_size, shuffle=False)
     pos_graph_embeddings = []
@@ -231,6 +232,7 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     prototypes_table['molecule_id'] = molecules_id
     prototypes_table['prototypes'] = all_prototypes
     prototypes_table['density'] = samples_densities
+    prototypes_table.to_csv('./proto_table.csv', index=False)
 
     # get the prototype embeddings for each sample
     prototypes_emb = proto_centroids[np.array(all_prototypes) - 1]
@@ -238,8 +240,49 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     return prototypes_table, prototypes_emb
 
 
-def prototype_contrastive_training():
-    a=1
+def prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion):
+    id2idx = {pid.item(): idx for idx, pid in enumerate(molecule_id)}
+    encoder.train()
+    epoch_train_loss = 0
+    for i, data in enumerate(proto_train_loader):
+        # get the neg prototypes id
+        neg_proto_id_all = list(set(id2idx.keys()) - set(data.id.tolist()))
+
+        # move the data into cuda
+        data = data.to(device)
+
+        # get all pos and neg prototypes embeddings
+        pos_indices = [id2idx[id.item()] for id in data.id]
+        pos_prototypes = prototype_embeddings[pos_indices]
+        neg_proto_id = torch.tensor(sample(neg_proto_id_all, args.r), dtype=torch.int).to(device)
+        neg_indices = [id2idx[id.item()] for id in neg_proto_id]
+        neg_prototypes = prototype_embeddings[neg_indices]
+
+        proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0) # [pos_n + neg_n, D]
+
+        query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
+        query = projection(query)
+
+        logits_proto = torch.mm(query, proto_selected.t())
+        labels_proto = torch.arange(len(pos_indices), dtype=torch.long).to(device)
+
+        # scaling temperatures for the selected prototypes
+        temp_proto_pos = densities[pos_indices]
+        temp_proto_neg = densities[neg_indices]
+        temp_proto_all = torch.cat([temp_proto_pos, temp_proto_neg], dim=0)  # shape [pos_n + neg_n]
+        logits_proto /= temp_proto_all.unsqueeze(0)
+
+        loss = criterion(logits_proto, labels_proto)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        epoch_train_loss += loss.item()
+
+    avg_epoch_train_loss = epoch_train_loss / len(proto_train_loader)
+    print(f"Epoch [{epoch}/{args.proto_epoch}]  Loss: {avg_epoch_train_loss}")
+
+    return encoder, avg_epoch_train_loss
 
 
 def main():
@@ -247,7 +290,7 @@ def main():
     file_path = f"./checkpoints/{args.training_types}_model_{args.models}.pth"
 
     # load data
-    positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
+    positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
     all_pos_samples = pos_train_samples + pos_test_samples
 
     # check and get the representation model checkpoint
@@ -255,11 +298,7 @@ def main():
 
     # get the prototypes table
     if args.task == 'train':
-        prototypes_table, prototype_embeddings = get_prototypes(model, pos_train_samples, unl_train_samples) # get the prototypes during training process
-    elif args.task == 'test':
-        prototypes_table, prototype_embeddings = get_prototypes(model, pos_test_samples, unl_test_samples) # get the prototypes during test process
-    elif args.task == 'eval':
-        prototypes_table, prototype_embeddings = get_prototypes(model, positive_samples, unlabeled_samples) # get the prototypes of all positive samples to analysis the model performance
+        prototypes_table, prototype_embeddings = get_prototypes(model, all_pos_samples, unlabeled_samples) # get the prototypes during training process
 
     # train the prototype contrastive learning model
     proto_train_samples = pos_train_samples + unl_train_samples
@@ -267,70 +306,92 @@ def main():
     proto_train_loader = DataLoader(proto_train_samples, batch_size=args.batch_size, shuffle=True)
     proto_test_loader = DataLoader(proto_test_samples, batch_size=args.batch_size, shuffle=False)
     
+    # training data
     molecule_id = prototypes_table['molecule_id'].values.tolist()
-    prototypes = prototypes_table['prototypes'].values.tolist()
     densities = prototypes_table['density'].values.tolist()
     molecule_id = torch.tensor(molecule_id, dtype=torch.int)
     prototype_embeddings = torch.tensor(prototype_embeddings, dtype=torch.float)
     densities = torch.tensor(densities, dtype=torch.float)
 
     encoder = GINE(num_node_features=proto_train_samples[0].n_node_features, num_edge_features=proto_train_samples[0].n_edge_features, 
-            hidden_channels=args.hidden_channels,
-            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-    projection = ProjectionHead(in_dim=args.hidden_channels).to(device)
-    
+        hidden_channels=args.pcl_hidden_channels,
+        num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+    projection = ProjectionHead(in_dim=args.pcl_hidden_channels).to(device)
     optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learning_rate, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss()
-    encoder.train()
+
+    prototype_embeddings = prototype_embeddings.to(device)
+    densities = densities.to(device)
+    
     proto_train_loss = []
     for epoch in tqdm(range(1, args.proto_epoch + 1), desc='Training the prototype contrastive learning model...'):
+        # training
+        encoder, avg_epoch_train_loss = prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion)
+        proto_train_loss.append(avg_epoch_train_loss)
+
+        # evaluating
+        encoder.eval()
+        top1_correct = 0
+        top5_correct = 0
+        total_samples = 0
         total_loss = 0
-        for i, data in enumerate(proto_train_loader):
-            molecule_id_list = molecule_id.tolist()
-            data_id_list = data.id.tolist()
-            # neg_proto_id_all = list(set(molecule_id_list) - set(data_id_list))
-            neg_proto_id_all = [x for x in molecule_id_list if x not in data_id_list]
-            # print(len(neg_proto_id_all), len(set(molecule_id_list)), len(set(data_id_list)))
+        id2idx = {pid.item(): idx for idx, pid in enumerate(molecule_id)}
 
-            data = data.to(device)
-            molecule_id = molecule_id.to(device)
-            prototype_embeddings = prototype_embeddings.to(device)
-            densities = densities.to(device)
-        
-            pos_mask = torch.isin(molecule_id, data.id)
-            pos_prototypes = prototype_embeddings[pos_mask]
-            
-            neg_proto_id = torch.tensor(sample(neg_proto_id_all, args.r), dtype=torch.int).to(device)
-            neg_mask = torch.isin(molecule_id, neg_proto_id)
-            # print(len(neg_proto_id), neg_mask.sum())
-            neg_prototypes = prototype_embeddings[neg_mask]
+        with torch.no_grad():
+            for data in proto_test_loader:
+                # move the data into cuda
+                data = data.to(device)
 
-            proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0)
+                query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
+                query = projection(query)
 
-            query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
-            query = projection(query)
+                # 获取正样本 prototype embeddings
+                pos_indices = [id2idx[id.item()] for id in data.id]
+                pos_prototypes = prototype_embeddings[pos_indices]
 
-            logits_proto = torch.mm(query, proto_selected.t())
-            labels_proto = torch.linspace(0, query.size(0)-1, steps=query.size(0)).long().to(device)
+                # 获取负样本 prototype embeddings (可选，保持训练一致)
+                neg_proto_id_all = list(set(id2idx.keys()) - set(data.id.tolist()))
+                neg_proto_id = torch.tensor(sample(neg_proto_id_all, args.r), dtype=torch.int).to(device)
+                neg_indices = [id2idx[id.item()] for id in neg_proto_id]
+                neg_prototypes = prototype_embeddings[neg_indices]
 
-            # scaling temperatures for the selected prototypes
-            selected_mask = pos_mask | neg_mask
-            temp_proto = densities[selected_mask]
-            logits_proto /= temp_proto
+                # 合并正负样本
+                proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0)
 
-            loss = criterion(logits_proto, labels_proto)
+                # logits
+                logits_proto = torch.mm(query, proto_selected.t())
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-            iter_loss = loss / (pos_mask.sum() + neg_mask.sum())
-            # print(f'\t  Iteras: {i+1} | Loss: {iter_loss:.7f}')
+                # labels 对应正样本在 proto_selected 中的索引
+                labels_proto = torch.arange(len(pos_indices), dtype=torch.long).to(device)
 
-        avg_loss = total_loss / len(molecule_id.tolist())
-        proto_train_loss.append(avg_loss)
-        print(f"Epoch [{epoch}/{args.proto_epoch}]  Loss: {avg_loss}")
-    plot_train_loss(args.epoch, proto_train_loss, args.proto_models, args.proto_training_types)
+                # scaling temperatures
+                temp_proto_pos = densities[pos_indices]
+                temp_proto_neg = densities[neg_indices]
+                temp_proto_all = torch.cat([temp_proto_pos, temp_proto_neg], dim=0)  # shape [pos+neg]
+                logits_proto /= temp_proto_all.unsqueeze(0)
+
+                # loss
+                loss = criterion(logits_proto, labels_proto)
+                total_loss += loss.item()
+
+                # ===== Top-k Evaluation =====
+                _, topk_indices = torch.topk(logits_proto, k=5, dim=1)
+                top1_correct += (topk_indices[:, 0] == labels_proto).sum().item()
+                top5_correct += sum([labels_proto[i].item() in topk_indices[i].tolist() for i in range(len(labels_proto))])
+                total_samples += len(proto_test_loader)
+
+        # 输出
+        avg_loss = total_loss / total_samples
+        top1_acc = top1_correct / total_samples
+        top5_acc = top5_correct / total_samples
+
+        print(f"Test Loss: {avg_loss:.4f}")
+        print(f"Top-1 Accuracy: {top1_acc*100:.2f}%")
+        print(f"Top-5 Accuracy: {top5_acc*100:.2f}%")
+    
+    plot_train_loss(args.proto_epoch, proto_train_loss, args.models, args.proto_training_types)
+
+    # torch.save(encoder.state_dict(), f'./checkpoints/{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
 
 
 
