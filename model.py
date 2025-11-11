@@ -56,8 +56,7 @@ class GINE(torch.nn.Module):
         self.norm3 = GraphNorm(hidden_channels)
 
         self.dropout = Dropout(dropout)
-        self.fc_out = Linear(hidden_channels, num_classes)
-        self.batch_norm = BatchNorm1d(hidden_channels)
+        # self.batch_norm = BatchNorm1d(hidden_channels)
 
 
     def forward(self, x, edge_index, edge_attr, batch): 
@@ -78,7 +77,7 @@ class GINE(torch.nn.Module):
 
         x = global_mean_pool(x, batch)
 
-        x = self.batch_norm(x)
+        # x = self.batch_norm(x)
 
         return x
 

@@ -20,6 +20,7 @@ from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from scipy.spatial.distance import cdist
 from sklearn.model_selection import train_test_split
 from random import sample
+import seaborn as sns
 
 
 warnings.filterwarnings('ignore')
@@ -58,7 +59,7 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
 parser.add_argument('--proto_epoch', type=int, default=50, help='Number of training epochs')
-parser.add_argument('--r', type=int, default=10, help='number of randomly select neg prototypes')
+parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
 parser.add_argument('--pcl_hidden_channels', type=int, default=256, help='Number of hidden channels')
@@ -169,8 +170,8 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
             unl_graph_embeddings.append(emb.cpu())
             
 
-    pos_graph_embeddings = torch.cat(pos_graph_embeddings, dim=0).numpy()  # shape: [num_molecules, hidden_dim]
-    unl_graph_embeddings = torch.cat(unl_graph_embeddings, dim=0).numpy()
+    pos_graph_embeddings = F.normalize(torch.cat(pos_graph_embeddings), dim=-1).numpy()  # shape: [num_molecules, hidden_dim]
+    unl_graph_embeddings = F.normalize(torch.cat(unl_graph_embeddings), dim=-1).numpy()
 
     reducer_2d = umap.UMAP(random_state=42)
     umap_embeddings = reducer_2d.fit_transform(pos_graph_embeddings)
@@ -190,8 +191,8 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
         show_gnn_fp_consistency_results(pos_additives_names, umap_embeddings)
 
     # get the positive samples prototypes
-    proto_centroids = []
-    unique_labels = np.unique(labels)
+    proto_centroids = [] # [N, D]
+    unique_labels = np.unique(labels) # 1-N prototypes
     for label in unique_labels:
         cluster_points = pos_graph_embeddings[labels == label]
         centroid = np.mean(cluster_points, axis=0)
@@ -204,9 +205,9 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     closest_proto += 1
 
     # get unlabeled samples prototypes
-    all_graph_embeddings = np.vstack([pos_graph_embeddings, unl_graph_embeddings])
+    all_graph_embeddings = np.vstack([pos_graph_embeddings, unl_graph_embeddings]) # [pos + neg, D]
     all_prototypes = np.concatenate([np.array(labels), closest_proto])
-    densities = []
+    densities = [] # [N, ]
     for label in unique_labels:
         select_embeddings = all_graph_embeddings[all_prototypes == label]
         centroid = proto_centroids[unique_labels == label]
@@ -222,7 +223,11 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     # === scale the mean to temperature  ===
     densities = args.temperature * densities / densities.mean()
     densities = np.array(densities)
-    samples_densities = np.array([densities[unique_labels == label].item() for label in all_prototypes])
+
+    samples_densities = []
+    for label in all_prototypes:
+        sample_density = densities[unique_labels == label][0]
+        samples_densities.append(sample_density)
     
     pos_additives_ids = [int(i.item()) for i in pos_additives_names]
     unl_additives_ids = [int(i.item()) for i in unl_additives_names]
@@ -237,11 +242,37 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     # get the prototype embeddings for each sample
     prototypes_emb = proto_centroids[np.array(all_prototypes) - 1]
 
+
+    # umap_model = umap.UMAP(n_components=2, random_state=42)
+    # umap_embeddings = umap_model.fit_transform(all_graph_embeddings)  # [N, 2]
+
+    # # 将UMAP降维结果与prototype标签结合
+    # proto_labels = all_prototypes  # 该标签表示每个样本对应的prototype类别
+
+    # # 生成一个DataFrame方便绘图
+    # umap_df = pd.DataFrame(umap_embeddings, columns=['UMAP1', 'UMAP2'])
+    # umap_df['Prototype'] = proto_labels
+
+    # # 使用Seaborn绘制UMAP结果，按prototype着色
+    # plt.figure(figsize=(10, 8))
+    # sns.scatterplot(data=umap_df, x='UMAP1', y='UMAP2', hue='Prototype', palette='tab10', s=50, edgecolor=None, alpha=0.7)
+
+    # # 设置图形的标题和标签
+    # plt.title('UMAP of Graph Embeddings by Prototype', fontsize=16)
+    # plt.xlabel('UMAP 1', fontsize=14)
+    # plt.ylabel('UMAP 2', fontsize=14)
+
+    # # 显示图形
+    # plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
+    # plt.tight_layout()
+    # plt.savefig('./V3/plots/labeled_all_samples.png', dpi=600)
+
     return prototypes_table, prototypes_emb
 
 
 def prototype_contrastive_training(epoch, model, encoder, projection, optimizer, proto_train_loader, molecule_id, prototype_embeddings, densities, criterion):
     id2idx = {pid.item(): idx for idx, pid in enumerate(molecule_id)}
+    
     encoder.train()
     epoch_train_loss = 0
     total_samples = 0
@@ -272,16 +303,22 @@ def prototype_contrastive_training(epoch, model, encoder, projection, optimizer,
         # print("std cosine:", cosine.std().item())
 
         query = projection(query)
-        
+        query = F.normalize(query, dim=-1)
+        # proto_selected = query.clone()
+        proto_selected = F.normalize(proto_selected, dim=-1)
 
         logits_proto = torch.mm(query, proto_selected.t())
         labels_proto = torch.arange(len(pos_indices), dtype=torch.long).to(device)
+        print('Q:', query)
+        
+        print('logits', logits_proto)
 
-        # scaling temperatures for the selected prototypes
-        temp_proto_pos = densities[pos_indices]
-        temp_proto_neg = densities[neg_indices]
-        temp_proto_all = torch.cat([temp_proto_pos, temp_proto_neg], dim=0)  # shape [pos_n + neg_n]
-        logits_proto /= temp_proto_all.unsqueeze(0)
+
+        # # scaling temperatures for the selected prototypes
+        # temp_proto_pos = densities[pos_indices]
+        # temp_proto_neg = densities[neg_indices]
+        # temp_proto_all = torch.cat([temp_proto_pos, temp_proto_neg], dim=0)  # shape [pos_n + neg_n]
+        # logits_proto /= temp_proto_all.unsqueeze(0)
 
         loss = criterion(logits_proto, labels_proto)
 
@@ -295,6 +332,68 @@ def prototype_contrastive_training(epoch, model, encoder, projection, optimizer,
     print(f"Epoch [{epoch}/{args.proto_epoch}]  Loss: {avg_epoch_train_loss}")
 
     return encoder, projection, avg_epoch_train_loss
+
+
+def prototype_contrastive_eval(encoder, projection, proto_test_loader, molecule_id, prototype_embeddings, densities, criterion):
+    encoder.eval()
+    projection.eval()
+    top1_correct = 0
+    top5_correct = 0
+    total_samples = 0
+    total_loss = 0
+    id2idx = {pid.item(): idx for idx, pid in enumerate(molecule_id)}
+
+    with torch.no_grad():
+        for data in proto_test_loader:
+            # move the data into cuda
+            data = data.to(device)
+
+            query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
+            query = projection(query)
+
+
+            pos_indices = [id2idx[id.item()] for id in data.id]
+            pos_prototypes = prototype_embeddings[pos_indices]
+
+            neg_proto_id_all = list(set(id2idx.keys()) - set(data.id.tolist()))
+            neg_proto_id = torch.tensor(sample(neg_proto_id_all, args.r), dtype=torch.int).to(device)
+            neg_indices = [id2idx[id.item()] for id in neg_proto_id]
+            neg_prototypes = prototype_embeddings[neg_indices]
+
+
+            proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0)
+            query = F.normalize(query, dim=-1)
+            proto_selected = F.normalize(proto_selected, dim=-1)
+
+            # logits
+            logits_proto = torch.mm(query, proto_selected.t())
+
+            labels_proto = torch.arange(len(pos_indices), dtype=torch.long).to(device)
+
+            # scaling temperatures
+            temp_proto_pos = densities[pos_indices]
+            temp_proto_neg = densities[neg_indices]
+            temp_proto_all = torch.cat([temp_proto_pos, temp_proto_neg], dim=0)  # shape [pos+neg]
+            logits_proto /= temp_proto_all.unsqueeze(0)
+
+            # loss
+            loss = criterion(logits_proto, labels_proto)
+            total_loss += loss.item()
+
+            # ===== Top-k Evaluation =====
+            _, topk_indices = torch.topk(logits_proto, k=5, dim=1)
+            top1_correct += (topk_indices[:, 0] == labels_proto).sum().item()
+            top5_correct += (topk_indices == labels_proto.unsqueeze(1)).any(dim=1).sum().item()
+            total_samples += len(data)
+
+
+    avg_loss = total_loss / total_samples
+    top1_acc = top1_correct / total_samples
+    top5_acc = top5_correct / total_samples
+
+    print(f"Test Loss: {avg_loss:.4f}")
+    print(f"Top-1 Accuracy: {top1_acc*100:.2f}%")
+    print(f"Top-5 Accuracy: {top5_acc*100:.2f}%")
 
 
 def main():
@@ -329,8 +428,13 @@ def main():
         hidden_channels=args.pcl_hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
     projection = ProjectionHead(in_dim=args.pcl_hidden_channels).to(device)
-    optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projection.parameters()), lr=args.learning_rate, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss()
+    # load ucl model parameters
+    encoder.load_state_dict(model.state_dict())
+    for param in encoder.parameters():
+        param.requires_grad = True
+    optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projection.parameters()), lr=args.learning_rate, weight_decay=5e-4)
+
 
     prototype_embeddings = prototype_embeddings.to(device)
     densities = densities.to(device)
@@ -342,66 +446,8 @@ def main():
         proto_train_loss.append(avg_epoch_train_loss)
 
         # evaluating
-        encoder.eval()
-        projection.eval()
-        top1_correct = 0
-        top5_correct = 0
-        total_samples = 0
-        total_loss = 0
-        id2idx = {pid.item(): idx for idx, pid in enumerate(molecule_id)}
-
-        with torch.no_grad():
-            for data in proto_test_loader:
-                # move the data into cuda
-                data = data.to(device)
-
-                query = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
-                query = projection(query)
-
-
-                pos_indices = [id2idx[id.item()] for id in data.id]
-                pos_prototypes = prototype_embeddings[pos_indices]
-
-                # 获取负样本 prototype embeddings (可选，保持训练一致)
-                neg_proto_id_all = list(set(id2idx.keys()) - set(data.id.tolist()))
-                neg_proto_id = torch.tensor(sample(neg_proto_id_all, args.r), dtype=torch.int).to(device)
-                neg_indices = [id2idx[id.item()] for id in neg_proto_id]
-                neg_prototypes = prototype_embeddings[neg_indices]
-
-
-                proto_selected = torch.cat([pos_prototypes, neg_prototypes], dim=0)
-
-                # logits
-                logits_proto = torch.mm(query, proto_selected.t())
-
-                # labels 对应正样本在 proto_selected 中的索引
-                labels_proto = torch.arange(len(pos_indices), dtype=torch.long).to(device)
-
-                # scaling temperatures
-                temp_proto_pos = densities[pos_indices]
-                temp_proto_neg = densities[neg_indices]
-                temp_proto_all = torch.cat([temp_proto_pos, temp_proto_neg], dim=0)  # shape [pos+neg]
-                logits_proto /= temp_proto_all.unsqueeze(0)
-
-                # loss
-                loss = criterion(logits_proto, labels_proto)
-                total_loss += loss.item()
-
-                # ===== Top-k Evaluation =====
-                _, topk_indices = torch.topk(logits_proto, k=5, dim=1)
-                top1_correct += (topk_indices[:, 0] == labels_proto).sum().item()
-                top5_correct += (topk_indices == labels_proto.unsqueeze(1)).any(dim=1).sum().item()
-                total_samples += len(data)
-
-
-        avg_loss = total_loss / total_samples
-        top1_acc = top1_correct / total_samples
-        top5_acc = top5_correct / total_samples
-
-        print(f"Test Loss: {avg_loss:.4f}")
-        print(f"Top-1 Accuracy: {top1_acc*100:.2f}%")
-        print(f"Top-5 Accuracy: {top5_acc*100:.2f}%")
-    
+        prototype_contrastive_eval(encoder, projection, proto_test_loader, molecule_id, prototype_embeddings, densities, criterion)
+        
     plot_train_loss(args.proto_epoch, proto_train_loss, args.models, args.proto_training_types)
 
     # torch.save(encoder.state_dict(), f'./checkpoints/{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
