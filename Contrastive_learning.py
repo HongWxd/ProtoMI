@@ -42,7 +42,8 @@ parser.add_argument('--models', type=str, default='GINE', help='Training models'
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
-parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
+parser.add_argument('--retrain_usl', type=bool, default=True, help='retrain the usl models')
+parser.add_argument('--ucl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 
 # graph augmentation configs
 parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
@@ -145,9 +146,8 @@ def unsupervised_training(pos_train_samples, pos_test_samples):
 
         print(f"Epoch [{epoch}/{args.epoch}]  Loss: {avg_loss}")
     plot_train_loss(args.epoch, unsuper_train_loss, args.models, args.training_types)
-    torch.save(best_model.state_dict(), f'./checkpoints/{args.training_types}_model_{args.models}.pth')
 
-    return best_model
+    return best_model, silhouette_scores
 
 
 def load_data(data_path):
@@ -171,10 +171,21 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
                 num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
             model.load_state_dict(torch.load(file_path)) # load the checkpoints
     else:
-        model = unsupervised_training(pos_train_samples, pos_test_samples)
+        best_model = None
+        best_sil_score = -1
+        for trial in tqdm(range(args.ucl_trials), desc=f'Unsupervised learning trials...'):
+            model, silhouette_scores = unsupervised_training(pos_train_samples, pos_test_samples)
+            if silhouette_scores > best_sil_score:
+                best_sil_score = silhouette_scores
+                best_model = copy.deepcopy(model)
+                best_trial = trial + 1
+        
+        print(f'Best trial from unsupervised learning: {best_trial}')
+        print(f'Best silhouette score from unsupervised learning: {best_sil_score}')
 
-    return model
+        torch.save(best_model.state_dict(), f'./checkpoints/{args.training_types}_model_{args.models}.pth')
 
+    return best_model
 
 def get_prototypes(model, pos_samples, unlabeled_samples):
     # get the original cluster in the positive samples
@@ -275,15 +286,18 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
     # get the prototype embeddings for each sample
     prototypes_emb = proto_centroids[np.array(all_prototypes) - 1]
     unl_proto_embeddings = proto_centroids[closest_proto - 1]
+    pos_proto_embeddings = proto_centroids[labels - 1]
 
     batch_size = 8192
     all_logits = []
     unl_graph_embeddings = torch.tensor(unl_graph_embeddings).to(device)
     unl_proto_embeddings = torch.tensor(unl_proto_embeddings).to(device)
+    pos_graph_embeddings = torch.tensor(pos_graph_embeddings).to(device)
+    pos_proto_embeddings = torch.tensor(pos_proto_embeddings).to(device)
 
-    for i in range(0, unl_graph_embeddings.size(0), batch_size):
-        emb_batch = unl_graph_embeddings[i:i+batch_size]  # [B, D]
-        logits_batch = torch.matmul(emb_batch, unl_proto_embeddings.t())  # [B, P]
+    for i in range(0, pos_graph_embeddings.size(0), batch_size):
+        emb_batch = pos_graph_embeddings[i:i+batch_size]  # [B, D]
+        logits_batch = torch.matmul(emb_batch, pos_proto_embeddings.t())  # [B, P]
         all_logits.append(logits_batch.cpu())
     
     logits = torch.cat(all_logits, dim=0)
