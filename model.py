@@ -88,7 +88,20 @@ class ProjectionHead(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(in_dim, in_dim),
             nn.ReLU(),
-            nn.Linear(in_dim, proj_dim)
+            nn.Linear(in_dim, proj_dim),
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
+
+class ProjectionHead_PCL(nn.Module):
+    def __init__(self, in_dim, proj_dim=128):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, in_dim),
+            nn.ReLU(),
+            nn.Linear(in_dim, proj_dim),
+            nn.BatchNorm1d(proj_dim)
         )
 
     def forward(self, x):
