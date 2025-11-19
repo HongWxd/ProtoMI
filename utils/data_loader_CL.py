@@ -22,10 +22,17 @@ class MoleculeDataset(Dataset):
 
         self.all_smiles = []
         self.id = []
+        self.names = []
         # load all molecules smiles
-        for smile, id in tqdm(zip(self.reported_smiles, list(range(len(self.reported_formulas)))), desc='Loading all reported molecules'):
+        for smile, id, name in tqdm(zip(self.reported_smiles, list(range(len(self.reported_formulas))), self.reported_formulas), desc='Loading all reported molecules'):
             self.all_smiles.append(smile)
             self.id.append(int(id))
+            self.names.append(name)
+
+        additive_id_df = pd.DataFrame()
+        additive_id_df['id'] = self.id
+        additive_id_df['name'] = self.names
+        additive_id_df.to_csv('./V3/processed_data/additive_id_mapping.csv', index=False)
 
         for cid in tqdm(self.cids, desc='Loading all molecules from searching space'):
             _, _, smile, _, _, _, _ = self.read_from_one_call(cid)
