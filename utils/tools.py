@@ -21,6 +21,7 @@ from sklearn.metrics import silhouette_score
 
 
 
+
 def one_hot_encoding(x, permitted_list):
     """
     Maps input elements x which are not in the permitted list to the last element
@@ -40,7 +41,7 @@ def get_atom_features(atom, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mea
     """
     Takes an RDKit atom object as input and gives a 1d-numpy array of atom features as output.
     """
-
+    node_features_labels = []
     # define list of permitted atoms
     permitted_list_of_atoms =  ['C','N','O','S','F','Si','P','Cl','Br','Mg','Na','Ca','Fe','As','Al','I', 'B','V','K','Tl','Yb','Sb','Sn','Ag','Pd','Co','Se','Ti','Zn', 'Li','Ge','Cu','Au','Ni','Cd','In','Mn','Zr','Cr','Pt','Hg','Pb','Unknown']
     
@@ -48,44 +49,75 @@ def get_atom_features(atom, mass_mean, mass_std, vdw_mean, vdw_std, covalent_mea
         permitted_list_of_atoms = ['H'] + permitted_list_of_atoms
     
     # compute atom features
-    atom_type_enc = one_hot_encoding(str(atom.GetSymbol()), permitted_list_of_atoms)
-    n_heavy_neighbors_enc = one_hot_encoding(int(atom.GetDegree()), [0, 1, 2, 3, 4, "MoreThanFour"])
-    formal_charge_enc = one_hot_encoding(int(atom.GetFormalCharge()), [-3, -2, -1, 0, 1, 2, 3, "Extreme"])
-    hybridisation_type_enc = one_hot_encoding(str(atom.GetHybridization()), ["S", "SP", "SP2", "SP3", "SP3D", "SP3D2", "OTHER"])
-    is_in_a_ring_enc = [int(atom.IsInRing())]
-    is_aromatic_enc = [int(atom.GetIsAromatic())]
-    atomic_mass_scaled = [float((atom.GetMass() - mass_mean)/mass_std)]
-    vdw_radius_scaled = [float((Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum()) - vdw_mean)/vdw_std)]
-    covalent_radius_scaled = [float((Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum()) - covalent_mean)/covalent_std)]
+    atom_type_enc = one_hot_encoding(str(atom.GetSymbol()), permitted_list_of_atoms) # 43
+    node_features_labels += permitted_list_of_atoms
+
+    n_heavy_neighbors_enc = one_hot_encoding(int(atom.GetDegree()), [0, 1, 2, 3, 4, "MoreThanFour"]) # 6
+    node_features_labels += ['n_heavy_neighbors_0', 'n_heavy_neighbors_1', 'n_heavy_neighbors_2', 'n_heavy_neighbors_3', 'n_heavy_neighbors_4', "n_heavy_neighbors_MoreThanFour"]
+
+    formal_charge_enc = one_hot_encoding(int(atom.GetFormalCharge()), [-3, -2, -1, 0, 1, 2, 3, "Extreme"]) # 8
+    node_features_labels += ['formal_charge_-3', 'formal_charge_-2', 'formal_charge_-1', 'formal_charge_0', 'formal_charge_1', 'formal_charge_2', 'formal_charge_3', "formal_charge_Extreme"]
+
+    hybridisation_type_enc = one_hot_encoding(str(atom.GetHybridization()), ["S", "SP", "SP2", "SP3", "SP3D", "SP3D2", "OTHER"]) # 7
+    node_features_labels += ["S", "SP", "SP2", "SP3", "SP3D", "SP3D2", "OTHER"]
+
+    is_in_a_ring_enc = [int(atom.IsInRing())] # 1
+    node_features_labels += ['is_in_a_ring'] * len(is_in_a_ring_enc)
+
+    is_aromatic_enc = [int(atom.GetIsAromatic())] # 1
+    node_features_labels += ['is_aromatic'] * len(is_aromatic_enc)
+
+    atomic_mass_scaled = [float((atom.GetMass() - mass_mean)/mass_std)] # 1
+    node_features_labels += ['atomic_mass_scaled'] * len(atomic_mass_scaled)
+
+    vdw_radius_scaled = [float((Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum()) - vdw_mean)/vdw_std)]  # 1
+    node_features_labels += ['vdw_radius_scaled'] * len(vdw_radius_scaled)
+
+    covalent_radius_scaled = [float((Chem.GetPeriodicTable().GetRcovalent(atom.GetAtomicNum()) - covalent_mean)/covalent_std)] # 1
+    node_features_labels += ['covalent_radius_scaled'] * len(covalent_radius_scaled)
+
     atom_feature_vector = atom_type_enc + n_heavy_neighbors_enc + formal_charge_enc + hybridisation_type_enc + is_in_a_ring_enc + is_aromatic_enc + atomic_mass_scaled + vdw_radius_scaled + covalent_radius_scaled
                                     
     if use_chirality == True:
         chirality_type_enc = one_hot_encoding(str(atom.GetChiralTag()), ["CHI_UNSPECIFIED", "CHI_TETRAHEDRAL_CW", "CHI_TETRAHEDRAL_CCW", "CHI_OTHER"])
-        atom_feature_vector += chirality_type_enc
+        node_features_labels += ["CHI_UNSPECIFIED", "CHI_TETRAHEDRAL_CW", "CHI_TETRAHEDRAL_CCW", "CHI_OTHER"]
+        atom_feature_vector += chirality_type_enc # 4
     
     if hydrogens_implicit == True:
-        n_hydrogens_enc = one_hot_encoding(int(atom.GetTotalNumHs()), [0, 1, 2, 3, 4, "MoreThanFour"])
+        n_hydrogens_enc = one_hot_encoding(int(atom.GetTotalNumHs()), [0, 1, 2, 3, 4, "MoreThanFour"]) # 6
+        node_features_labels += ['n_hydrogens_0', 'n_hydrogens_1', 'n_hydrogens_2', 'n_hydrogens_3', 'n_hydrogens_4', "n_hydrogens_MoreThanFour"]
         atom_feature_vector += n_hydrogens_enc
-
-    return np.array(atom_feature_vector)
+    
+    return np.array(atom_feature_vector) 
 
 def get_bond_features(bond, 
                       use_stereochemistry = True):
     """
     Takes an RDKit bond object as input and gives a 1d-numpy array of bond features as output.
     """
-
+    edge_features_labels = []
+    # compute bond features
     permitted_list_of_bond_types = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE, Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
     bond_type_enc = one_hot_encoding(bond.GetBondType(), permitted_list_of_bond_types)
+    edge_features_labels += ['bond_type_single', 'bond_type_double', 'bond_type_triple', 'bond_type_aromatic']
+    
     bond_is_conj_enc = [int(bond.GetIsConjugated())]
+    edge_features_labels += ['bond_is_conjugated'] * len(bond_is_conj_enc)
+
     bond_is_in_ring_enc = [int(bond.IsInRing())]
+    edge_features_labels += ['bond_is_in_ring'] * len(bond_is_in_ring_enc)
 
     bond_dir_enc = one_hot_encoding(str(bond.GetBondDir()), ["NONE", "BEGINWEDGE", "BEGINDASH", "ENDDOWNRIGHT", "ENDUPRIGHT"])
+    edge_features_labels += ["bond_dir_none", "bond_dir_beginwedge", "bond_dir_begindash", "bond_dir_enddownright", "bond_dir_endupright"]
+
     bond_is_aromatic_enc = [int(bond.GetIsAromatic())]
+    edge_features_labels += ['bond_is_aromatic'] * len(bond_is_aromatic_enc)
+
     bond_feature_vector = bond_type_enc + bond_is_conj_enc + bond_is_in_ring_enc + bond_dir_enc + bond_is_aromatic_enc
     
     if use_stereochemistry == True:
         stereo_type_enc = one_hot_encoding(str(bond.GetStereo()), ["STEREOZ", "STEREOE", "STEREOANY", "STEREONONE"])
+        edge_features_labels += ["stereo_type_stereoz", "stereo_type_stereoe", "stereo_type_stereoany", "stereo_type_stereonone"]
         bond_feature_vector += stereo_type_enc
 
     return np.array(bond_feature_vector)
@@ -197,90 +229,6 @@ def get_statistical_values(x_smiles):
 
     return mol, all_masses, all_vdw, all_covalent
 
-def self_training(model, labeled_train_data, unlabeled_train_data, device, pseudo_thr, epoch, args):
-    threshold = args.threshold   
-    model.eval()
-    unlabeled_loader = DataLoader(unlabeled_train_data, batch_size=args.batch_size, shuffle=False)
-    with torch.no_grad():
-        for i, data in enumerate(unlabeled_loader):
-            data = data.to(device)
-            logits = model(data.x, data.edge_index, data.edge_attr, data.batch, data.descriptors)
-            probs = F.softmax(logits, dim=-1)
-            confs, preds = probs.max(dim=1)
-            high_conf_mask = confs > threshold
-
-            if high_conf_mask.sum() > 0:
-                data.y = data.y.clone()
-                data.mask = data.mask.clone()
-                data.y[high_conf_mask] = preds[high_conf_mask]
-                data.mask[high_conf_mask] = True
-                
-                update_list = data[high_conf_mask]
-                confs_list = confs[high_conf_mask]
-                if args.use_SB:
-                    pos_sample = 0
-                    neg_sample = 0
-                    for data in labeled_train_data:
-                        if data.y == 0:
-                            neg_sample += 1
-                        elif data.y == 1:
-                            pos_sample += 1
-
-                    pos_need = pseudo_thr - pos_sample
-                    neg_need = pseudo_thr - neg_sample
-                    update_list = sample_balancer(update_list, confs_list, pos_need, neg_need) # balance the unlabeled samples
-
-                for update_data in update_list:
-                    if len(labeled_train_data) >= pseudo_thr*2:
-                        continue
-                    
-                    update_data = update_data.cpu()
-                    update_data.mask = update_data.mask.item()
-                    update_data.cid = update_data.cid.item()
-                    update_data.n_nodes = update_data.n_nodes.item()
-                    update_data.n_edges = update_data.n_edges.item()
-                    update_data.n_node_features = update_data.n_node_features.item()
-                    update_data.n_edge_features = update_data.n_edge_features.item()
-                    labeled_train_data.append(update_data)
-    
-    return labeled_train_data
-
-def sample_balancer(update_list, confs_list, pos_need, neg_need):
-    balanced_update_list = []
-    pos_data = []
-    neg_data = []
-    pos_conf = []
-    neg_conf = []
-    for data, confs in zip(update_list, confs_list):
-        if data.y.item() == 1:
-            pos_data.append(data)
-            pos_conf.append(confs)
-        elif data.y.item() == 0:
-            neg_data.append(data)
-            neg_conf.append(confs)
-
-    if pos_need >= len(pos_data):
-        balanced_update_list += pos_data
-    else:
-        if pos_need > 0 and pos_need < len(pos_conf):
-            print(pos_need, len(pos_conf))
-            _, pos_topk_indices = torch.topk(torch.tensor(pos_conf), pos_need, largest=True)
-            pos_mask = torch.zeros_like(torch.tensor(pos_conf), dtype=torch.bool)
-            pos_mask[pos_topk_indices] = True
-            select_pos_data = [data for i, data in enumerate(pos_data) if pos_mask[i]]
-            balanced_update_list += select_pos_data
-    
-    if neg_need >= len(neg_data):
-        balanced_update_list += neg_data
-    else:
-        if neg_need > 0 and neg_need < len(neg_conf):
-            _, neg_topk_indices = torch.topk(torch.tensor(neg_conf), neg_need, largest=True)
-            neg_mask = torch.zeros_like(torch.tensor(neg_conf), dtype=torch.bool)
-            neg_mask[neg_topk_indices] = True
-            select_neg_data = [data for i, data in enumerate(neg_data) if neg_mask[i]]
-            balanced_update_list += select_neg_data
-
-    return balanced_update_list
 
 def training_data_analysis(fold, train_data, test_data):
     train_label_set = [i for i in train_data if i.mask == True]

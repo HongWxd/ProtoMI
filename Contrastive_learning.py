@@ -40,7 +40,7 @@ parser.add_argument('--models', type=str, default='GINE', help='Training models'
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
-parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
+parser.add_argument('--retrain_usl', type=bool, default=True, help='retrain the usl models')
 parser.add_argument('--ucl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 
 # graph augmentation configs
@@ -84,7 +84,7 @@ def unsupervised_training(pos_train_samples, pos_test_samples):
     # train a GNN model to represent all positive training data and get the prototypes
     pos_train_samples = pos_train_samples + pos_test_samples
     train_loader = DataLoader(pos_train_samples, batch_size=args.usl_batch_size, shuffle=True)
-    model = Cluster_GINE(num_node_features=pos_train_samples[0].n_node_features, num_edge_features=pos_train_samples[0].n_edge_features, 
+    model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.usl_hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
     projection_head1 = ProjectionHead(in_dim=args.usl_hidden_channels).to(device)
@@ -167,7 +167,7 @@ def load_data(data_path):
 
 def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     if os.path.exists(file_path) and args.retrain_usl == False:
-        model = Cluster_GINE(num_node_features=pos_train_samples[0].n_node_features, num_edge_features=pos_train_samples[0].n_edge_features, 
+        model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.usl_hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
         model.load_state_dict(torch.load(file_path)) # load the checkpoints
@@ -413,7 +413,7 @@ def main():
     proto_label = torch.tensor(proto_label, dtype=torch.int)
 
 
-    encoder = GINE(num_node_features=proto_train_samples[0].n_node_features, num_edge_features=proto_train_samples[0].n_edge_features, 
+    encoder = GINE(num_node_features=proto_train_samples[0].x.shape[1], num_edge_features=proto_train_samples[0].edge_attr.shape[1], 
         hidden_channels=args.pcl_hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
     projection = ProjectionHead_PCL(in_dim=args.pcl_hidden_channels).to(device)

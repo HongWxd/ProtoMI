@@ -89,7 +89,7 @@ pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pc
 unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
 
 
-encoder = GINE(num_node_features=pos_train_samples[0].n_node_features, num_edge_features=pos_train_samples[0].n_edge_features, 
+encoder = GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
         hidden_channels=args.pcl_hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 projection = ProjectionHead_PCL(in_dim=args.pcl_hidden_channels).to(device)
@@ -97,7 +97,7 @@ encoder.load_state_dict(torch.load(f'./checkpoints/encoder_{args.proto_models}_e
 projection.load_state_dict(torch.load(f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')) # load the checkpoints
 proto_centroids = torch.load(f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
 
-model = Cluster_GINE(num_node_features=pos_train_samples[0].n_node_features, num_edge_features=pos_train_samples[0].n_edge_features, 
+model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.usl_hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 model.load_state_dict(torch.load(file_path)) # load the checkpoints

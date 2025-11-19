@@ -7,6 +7,7 @@ from utils.tools import Graph_data_generator, get_statistical_values, perturb_ed
 import numpy as np
 import json
 import random
+from sklearn.decomposition import PCA
 
 class MoleculeDataset(Dataset):
     def __init__(self, labeled_path, searching_space_path):
@@ -51,11 +52,11 @@ class MoleculeDataset(Dataset):
         # add all molecules data
         for smile, id in zip(tqdm(self.all_smiles, desc='Converting all smiles data to graph data'), self.id):
             # get the graph data for each compound
-            x, edge_index, edge_attr, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
+            x, edge_index, edge_attr, n_nodes, n_edges, _, _ = Graph_data_generator(smile, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
                 continue # if RDKit package can not convert smile into mol, we will drop this molecule
 
-            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, id = id, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
+            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, id = id, n_nodes = n_nodes, n_edges = n_edges)
             data_list.append(graph_data)
         
         # normalization for edge features
@@ -68,6 +69,10 @@ class MoleculeDataset(Dataset):
         for data in data_list:
             if data.edge_attr is not None:
                 data.edge_attr = (data.edge_attr - edge_mean) / edge_std
+
+        # filter the redundent features
+        data_list = self.features_reduction(data_list, 'node')
+        data_list = self.features_reduction(data_list, 'edge')
         
         return data_list        
 
@@ -80,13 +85,41 @@ class MoleculeDataset(Dataset):
         heavy_atom = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'heavy_atom'].values[0])
         return idx, formula, smile, fingerprint, topological, weight, heavy_atom
     
+    def features_reduction(self, data_list, features_type):
+        all_features = []
+        for data in data_list:
+            if hasattr(data, 'x') and data.x is not None:
+                if features_type == 'node':
+                    all_features.append(data.x.numpy())
+                elif features_type == 'edge':
+                    all_features.append(data.edge_attr.numpy())
+
+        X = np.vstack(all_features)
+
+        pca = PCA(n_components=min(10, X.shape[1]))  
+        pca.fit(X)
+
+        loadings = pca.components_  # shape = [n_components, n_features]
+        n_components = loadings.shape[0]
+
+        top_k = min(10, n_components)
+        loadings_subset = loadings[:top_k, :]
+        low_contrib_mask = np.all(np.abs(loadings_subset) < 0.05, axis=0)
+        filtered_indices = np.where(~low_contrib_mask)[0]
+
+        for data in data_list:
+            if hasattr(data, 'x') and data.x is not None:
+                data.x = data.x[:, filtered_indices]
+
+        return data_list
+
     def analysis_dataset(self, data_list):
         nodes, edges, nodes_feature, edges_feature = 0, 0, 0, 0
         for value in data_list:
             nodes += value.n_nodes
             edges += value.n_edges
-            nodes_feature += value.n_node_features
-            edges_feature += value.n_edge_features
+            nodes_feature += value.x.shape[1]
+            edges_feature += value.edge_attr.shape[1]
         
         print('---------Here is the basic info of loaded dataset---------')
         print('avg nodes:', nodes / self.__len__())
@@ -132,23 +165,3 @@ class ContrastiveGraphDataset(Dataset):
     
     def __getitem__(self, idx):
         return self.positive_samples[idx]
-
-def contrastive_collate_fn(batch, dataset):
-    pairs, labels = [], []
-
-    for g in batch:
-        g1 = feature_noise(g, noise_level=0.1)
-        g2 = perturb_edges(g, perturb_ratio=0.1)
-        pairs.append((g1, g2))
-        labels.append(1)
-
-    num_neg = len(batch) * dataset.ratio
-    for _ in range(num_neg):
-        g_pos = random.choice(batch)
-        g_neg = random.choice(dataset.unlabeled_samples)
-        g1 = feature_noise(g_pos, noise_level=0.1)
-        g2 = perturb_edges(g_neg, perturb_ratio=0.1)
-        pairs.append((g1, g2))
-        labels.append(0)
-
-    return pairs, torch.tensor(labels, dtype=torch.float32)
