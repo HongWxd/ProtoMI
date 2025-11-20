@@ -9,7 +9,7 @@ import copy
 import time
 import umap
 import pickle
-from utils.tools import plot_train_loss, perturb_edges, info_nce_loss, try_multiple_cluster_combinations
+from utils.tools import plot_train_loss, perturb_edges, info_nce_loss, try_multiple_cluster_combinations, plot_PCL_Trials_SC
 from utils.graph_augmentation import Graph_Augmentation_Helper
 from utils.visualization import show_gnn_fp_consistency_results, plot_hierarchical_cluster_dendrogram, plot_cluster_distribution_UMAP
 import numpy as np
@@ -33,15 +33,15 @@ parser.add_argument('--usl_batch_size', type=int, default=256, help='Batch size 
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
 parser.add_argument('--usl_learning_rate', type=float, default=0.0005, help='Learning rate')
 parser.add_argument('--usl_hidden_channels', type=int, default=256, help='Number of hidden channels')
-parser.add_argument('--epoch', type=int, default=200, help='Number of training epochs')
+parser.add_argument('--epoch', type=int, default=500, help='Number of training epochs')
 parser.add_argument('--dropout', type=float, default=0.5, help='Value of dropout')
 parser.add_argument('--training_types', type=str, default='Unsupervised learning', help='training_types')
 parser.add_argument('--models', type=str, default='GINE', help='Training models')
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
-parser.add_argument('--retrain_usl', type=bool, default=True, help='retrain the usl models')
-parser.add_argument('--ucl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
+parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
+parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 
 # graph augmentation configs
 parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
@@ -61,7 +61,7 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 # prototypes configs
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
-parser.add_argument('--proto_epoch', type=int, default=500, help='Number of training epochs')
+parser.add_argument('--proto_epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
@@ -70,6 +70,7 @@ parser.add_argument('--pcl_learning_rate', type=float, default=0.00001, help='Le
 parser.add_argument('--pcl_batch_size', type=int, default=1024, help='Batch size for training')
 parser.add_argument('--threshold', type=float, default=0.3, help='threshold')
 parser.add_argument('--topk', type=int, default=25, help='top k samples for each prototype')
+parser.add_argument('--pcl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 
 
 # main configs
@@ -175,7 +176,7 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     else:
         best_model = None
         best_sil_score = -1
-        for trial in tqdm(range(args.ucl_trials), desc=f'Unsupervised learning trials...'):
+        for trial in tqdm(range(args.usl_trials), desc=f'Unsupervised learning trials...'):
             model, silhouette_scores = unsupervised_training(pos_train_samples, pos_test_samples)
             if silhouette_scores > best_sil_score:
                 best_sil_score = silhouette_scores
@@ -387,7 +388,7 @@ def prototype_contrastive_eval(encoder, projection, proto_test_loader, proto_cen
 
 def main():
     data_path = './data/all_data.pkl'
-    file_path = f"./checkpoints/{args.training_types}_model_{args.models}_126.pth"
+    file_path = f"./checkpoints/{args.training_types}_model_{args.models}.pth"
 
     # load data
     positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
@@ -413,53 +414,72 @@ def main():
     proto_label = torch.tensor(proto_label, dtype=torch.int)
 
 
-    encoder = GINE(num_node_features=proto_train_samples[0].x.shape[1], num_edge_features=proto_train_samples[0].edge_attr.shape[1], 
-        hidden_channels=args.pcl_hidden_channels,
-        num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
-    projection = ProjectionHead_PCL(in_dim=args.pcl_hidden_channels).to(device)
-    optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projection.parameters()), lr=args.pcl_learning_rate, weight_decay=5e-4)
 
-    
-    proto_train_loss = []
-    best_encoder = None
-    best_projection = None
-    best_embeddings = None
-    best_labels = None
-    best_proto_centroids = None
-    best_sc_cosine = -1
-    for epoch in tqdm(range(1, args.proto_epoch + 1), desc='Training the prototype contrastive learning model...'):
-        # get the prototypes embeddings
-        new_proto_centroids = update_proto_centroids(molecule_id, proto_label, encoder, projection, all_pos_samples)
-        if epoch == 1:
-            proto_centroids = new_proto_centroids
-        else:
-            proto_centroids = 0.999 * proto_centroids + 0.001 * new_proto_centroids
+    total_sc_scores = []
+    total_best_encoders = []
+    total_best_projections = []
+    total_best_embeddings = []
+    total_best_labels = []
+    total_best_proto_centroids = []
+    for trial in tqdm(range(1, args.pcl_trials + 1), desc=f'Prototype contrastive learning trials...'):
+        encoder = GINE(num_node_features=proto_train_samples[0].x.shape[1], num_edge_features=proto_train_samples[0].edge_attr.shape[1], 
+            hidden_channels=args.pcl_hidden_channels,
+            num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
+        projection = ProjectionHead_PCL(in_dim=args.pcl_hidden_channels).to(device)
+        optimizer = torch.optim.Adam(list(encoder.parameters()) + list(projection.parameters()), lr=args.pcl_learning_rate, weight_decay=5e-4)
 
-        # training
-        encoder, projection, avg_epoch_train_loss = prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, proto_centroids)
-        proto_train_loss.append(avg_epoch_train_loss)
+        
+        proto_train_loss = []
+        best_encoder = None
+        best_projection = None
+        best_embeddings = None
+        best_labels = None
+        best_proto_centroids = None
+        best_sc_cosine = -1
+        for epoch in tqdm(range(1, args.proto_epoch + 1), desc='Training the prototype contrastive learning model...'):
+            # get the prototypes embeddings
+            new_proto_centroids = update_proto_centroids(molecule_id, proto_label, encoder, projection, all_pos_samples)
+            if epoch == 1:
+                proto_centroids = new_proto_centroids
+            else:
+                proto_centroids = 0.999 * proto_centroids + 0.001 * new_proto_centroids
 
-        # evaluating
-        all_embeddings, all_labels, sc_cosine = prototype_contrastive_eval(encoder, projection, proto_test_loader, proto_centroids)
+            # training
+            encoder, projection, avg_epoch_train_loss = prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, proto_centroids)
+            proto_train_loss.append(avg_epoch_train_loss)
 
-        if sc_cosine > best_sc_cosine:
-            best_sc_cosine = sc_cosine
-            best_encoder = copy.deepcopy(encoder)
-            best_projection = copy.deepcopy(projection)
-            best_embeddings = all_embeddings
-            best_labels = all_labels
-            best_proto_centroids = proto_centroids
-            print(f'Update! Epoch: {epoch}, silhouette score: {sc_cosine}')
-    
-    plot_train_loss(args.proto_epoch, proto_train_loss, args.models, args.proto_training_types)
-    print(f'Best silhouette score: {best_sc_cosine}')
+            # evaluating
+            all_embeddings, all_labels, sc_cosine = prototype_contrastive_eval(encoder, projection, proto_test_loader, proto_centroids)
+
+            if sc_cosine > best_sc_cosine:
+                best_sc_cosine = sc_cosine
+                best_encoder = copy.deepcopy(encoder)
+                best_projection = copy.deepcopy(projection)
+                best_embeddings = all_embeddings
+                best_labels = all_labels
+                best_proto_centroids = proto_centroids
+                print(f'Update! Epoch: {epoch}, silhouette score: {sc_cosine}')
+        
+        plot_train_loss(args.proto_epoch, proto_train_loss, args.models, args.proto_training_types)
+        print(f'Trial {trial} | Best silhouette score: {best_sc_cosine}')
+
+        total_sc_scores.append(best_sc_cosine)
+        total_best_encoders.append(best_encoder)
+        total_best_projections.append(best_projection)
+        total_best_embeddings.append(best_embeddings)
+        total_best_labels.append(best_labels)
+        total_best_proto_centroids.append(best_proto_centroids)
+
+    plot_PCL_Trials_SC(total_sc_scores, args.proto_trials)
+    best_trial_idx = np.argmax(total_sc_scores)
+    print(f'Best trial: {best_trial_idx + 1} | Best silhouette score: {total_sc_scores[best_trial_idx]}')
 
 
     # UMAP visualization of the last epoch
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine', random_state=42)
-    emb_2d = reducer.fit_transform(best_embeddings)
+    emb_2d = reducer.fit_transform(total_best_embeddings[best_trial_idx])
 
-    proto_labels = best_labels + 1
+    proto_labels = total_best_labels[best_trial_idx] + 1
 
     umap_df = pd.DataFrame(emb_2d, columns=['UMAP1', 'UMAP2'])
     umap_df['Prototype'] = proto_labels
@@ -467,7 +487,7 @@ def main():
     plt.figure(figsize=(10, 8))
     sns.scatterplot(data=umap_df, x='UMAP1', y='UMAP2', hue='Prototype', palette='tab10', s=50, edgecolor=None, alpha=0.7)
 
-    plt.title('UMAP of Graph Embeddings by Prototype', fontsize=16)
+    plt.title(f'UMAP of Graph Embeddings by Prototype | sc: {total_sc_scores[best_trial_idx]}', fontsize=16)
     plt.xlabel('UMAP 1', fontsize=14)
     plt.ylabel('UMAP 2', fontsize=14)
 
@@ -475,9 +495,9 @@ def main():
     plt.tight_layout()
     plt.savefig('./V3/plots/test_results.png', dpi=600)
 
-    torch.save(best_encoder.state_dict(), f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
-    torch.save(best_projection.state_dict(), f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
-    torch.save(best_proto_centroids, f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
+    torch.save(total_best_encoders[best_trial_idx].state_dict(), f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
+    torch.save(total_best_projections[best_trial_idx].state_dict(), f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
+    torch.save(total_best_proto_centroids[best_trial_idx], f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
 
 
 if __name__=="__main__":

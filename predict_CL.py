@@ -6,7 +6,6 @@ from model import ProjectionHead_PCL, GINE, Cluster_GINE, ProjectionHead
 from tqdm import tqdm
 import pandas as pd
 import torch.nn.functional as F
-from utils.data_loader_CL import ContrastiveGraphDataset, contrastive_collate_fn
 from sklearn.metrics import silhouette_score
 import umap
 import matplotlib.pyplot as plt

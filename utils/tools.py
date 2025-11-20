@@ -307,37 +307,17 @@ def imbalanced_weights(train_data, train_loader, epoch, device):
 
     return total_masked, weights
 
-def plot_train_results(num_epochs, train_loss, total_test_loss, test_auc, fold):
-    epochs = list(range(1, num_epochs))
-
+def plot_PCL_Trials_SC(total_sc_scores, trials):
     plt.figure(figsize=(12, 5))
-
-    plt.subplot(2, 2, 1)
-    plt.plot(epochs, train_loss, marker='o', label='Train Loss', color='tab:blue')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Train Loss Curve')
-    plt.grid(True)
-    plt.legend()
-
-    plt.subplot(2, 2, 3)
-    plt.plot(epochs, total_test_loss, marker='o', label='Test Loss', color='tab:orange')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Test Loss Curve')
-    plt.grid(True)
-    plt.legend()
-
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, test_auc, marker='o', color='gray', label='Testing AUC')
-    plt.xlabel('Epoch')
-    plt.ylabel('AUC')
-    plt.title('Testing AUC Curve')
+    plt.plot(trials, total_sc_scores, marker='o', label='Silhoutte Score', color='tab:orange')
+    plt.xlabel('PCL Trials')
+    plt.ylabel('Silhoutte Core')
+    plt.title(f'Prototye Contrastive Learning Trials vs Silhoutte Score')
     plt.grid(True)
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig(f'./figs/fold_{fold+1}_loss_AUC_curve.png', dpi=600)
+    plt.savefig(f'./figs/PCL_Trials_SC.png', dpi=600)
 
 
 def plot_train_loss(num_epochs, train_loss, model, training_types):
