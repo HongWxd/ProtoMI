@@ -69,14 +69,14 @@ print("保留的特征数量:", len(filtered_feature_names))
 print("保留的特征名称:", filtered_feature_names)
 
 # 可视化热力图
-num_pc, num_feat = filtered_loadings.shape
+num_pc, num_feat = loadings_subset.shape
 
 # 网格坐标
 x, y = np.meshgrid(np.arange(num_feat), np.arange(num_pc))
 x = x.flatten()
 y = y.flatten()
 
-values = filtered_loadings.flatten()
+values = loadings_subset.flatten()
 
 # 气泡大小：用绝对值
 sizes = np.abs(values) / np.max(np.abs(values)) * 300  
@@ -84,7 +84,7 @@ sizes = np.abs(values) / np.max(np.abs(values)) * 300
 # 气泡颜色：用原始正负值
 colors = values
 
-plt.figure(figsize=(max(12, num_feat * 0.4), max(6, num_pc * 0.6)))
+plt.figure(figsize=(max(10, num_feat * 0.4), max(6, num_pc * 0.6)))
 
 plt.scatter(
     x, y, 
@@ -99,12 +99,12 @@ plt.gca().invert_yaxis()  # PC1 在顶部
 cbar = plt.colorbar(label='Loading Value')
 cbar.set_label('Loading Value', fontsize=12)
 
-plt.xticks(range(num_feat), filtered_feature_names, rotation=90, fontsize=14)
+plt.xticks(range(num_feat), feature_names, rotation=90, fontsize=14)
 plt.yticks(range(num_pc), [f"PC{i+1}" for i in range(num_pc)], fontsize=14)
 
 plt.title("PCA Feature Loadings - Bubble Heatmap", fontsize=18)
 plt.tight_layout()
-plt.savefig("./V3/plots/pca_feature_loadings_bubble_heatmap.png", dpi=300)
+plt.savefig("./V3/plots/pca_feature_loadings_bubble_heatmap.png", dpi=600)
 
 
 # ==============================

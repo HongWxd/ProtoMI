@@ -61,7 +61,7 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 # prototypes configs
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
-parser.add_argument('--proto_epoch', type=int, default=300, help='Number of training epochs')
+parser.add_argument('--proto_epoch', type=int, default=500, help='Number of training epochs')
 parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
@@ -399,7 +399,7 @@ def main():
 
     # get the prototypes table
     if args.task == 'train':
-        prototypes_table = get_prototypes(model, positive_samples_126, unlabeled_samples) # get the prototypes during training process
+        prototypes_table = get_prototypes(model, all_pos_samples, unlabeled_samples) # get the prototypes during training process
     
     # train the prototype contrastive learning model
     proto_train_samples = pos_train_samples + unl_train_samples
@@ -470,7 +470,7 @@ def main():
         total_best_labels.append(best_labels)
         total_best_proto_centroids.append(best_proto_centroids)
 
-    plot_PCL_Trials_SC(total_sc_scores, args.proto_trials)
+    plot_PCL_Trials_SC(total_sc_scores, args.pcl_trials)
     best_trial_idx = np.argmax(total_sc_scores)
     print(f'Best trial: {best_trial_idx + 1} | Best silhouette score: {total_sc_scores[best_trial_idx]}')
 

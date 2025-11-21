@@ -70,9 +70,9 @@ class MoleculeDataset(Dataset):
             if data.edge_attr is not None:
                 data.edge_attr = (data.edge_attr - edge_mean) / edge_std
 
-        # filter the redundent features
-        data_list = self.features_reduction(data_list, 'node')
-        data_list = self.features_reduction(data_list, 'edge')
+        # # filter the redundent features
+        # data_list = self.features_reduction(data_list, 'node')
+        # data_list = self.features_reduction(data_list, 'edge')
         
         return data_list        
 
@@ -104,7 +104,7 @@ class MoleculeDataset(Dataset):
 
         top_k = min(10, n_components)
         loadings_subset = loadings[:top_k, :]
-        low_contrib_mask = np.all(np.abs(loadings_subset) < 0.05, axis=0)
+        low_contrib_mask = np.all(np.abs(loadings_subset) < 0.01, axis=0)
         filtered_indices = np.where(~low_contrib_mask)[0]
 
         for data in data_list:
