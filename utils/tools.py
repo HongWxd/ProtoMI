@@ -408,34 +408,34 @@ def try_multiple_cluster_combinations(Z, all_embeddings, pos_additives_names, ar
     return best_k, best_labels, best_embeddings, best_names, best_Z
 
 def filter_cluster_outliers(embeddings, cluster_labels, alpha=1.5):
-        filtered_embeddings = []
-        filtered_labels = []
-        filtered_indices = []
+    filtered_embeddings = []
+    filtered_labels = []
+    filtered_indices = []
 
-        unique_clusters = np.unique(cluster_labels)
+    unique_clusters = np.unique(cluster_labels)
 
-        for cluster_id in unique_clusters:
-            idx = np.where(cluster_labels == cluster_id)[0]
-            cluster_emb = embeddings[idx]
+    for cluster_id in unique_clusters:
+        idx = np.where(cluster_labels == cluster_id)[0]
+        cluster_emb = embeddings[idx]
 
-            if len(cluster_emb) < 2:
-                continue
+        if len(cluster_emb) < 2:
+            continue
 
-            centroid = np.mean(cluster_emb, axis=0)
-            distances = np.linalg.norm(cluster_emb - centroid, axis=1)
+        centroid = np.mean(cluster_emb, axis=0)
+        distances = np.linalg.norm(cluster_emb - centroid, axis=1)
 
-            # threshold = mean + α * std
-            d_mean = distances.mean()
-            d_std = distances.std()
-            threshold = d_mean + alpha * d_std
+        # threshold = mean + α * std
+        d_mean = distances.mean()
+        d_std = distances.std()
+        threshold = d_mean + alpha * d_std
 
-            mask = distances <= threshold
+        mask = distances <= threshold
 
-            filtered_embeddings.append(cluster_emb[mask])
-            filtered_labels.append(cluster_labels[idx][mask])
-            filtered_indices.append(idx[mask])
+        filtered_embeddings.append(cluster_emb[mask])
+        filtered_labels.append(cluster_labels[idx][mask])
+        filtered_indices.append(idx[mask])
 
-        filtered_embeddings = np.vstack(filtered_embeddings)
-        filtered_labels = np.concatenate(filtered_labels)
-        filtered_indices = np.concatenate(filtered_indices)
-        return filtered_embeddings, filtered_labels, filtered_indices
+    filtered_embeddings = np.vstack(filtered_embeddings)
+    filtered_labels = np.concatenate(filtered_labels)
+    filtered_indices = np.concatenate(filtered_indices)
+    return filtered_embeddings, filtered_labels, filtered_indices
