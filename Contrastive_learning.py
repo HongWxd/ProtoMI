@@ -191,7 +191,7 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     return best_model
 
 
-def get_prototypes(model, pos_samples, unlabeled_samples):
+def get_prototypes(model, pos_samples, trial):
     # get the original cluster in the positive samples
     model.eval()
     projection_head = ProjectionHead(in_dim=args.usl_hidden_channels).to(device)
@@ -210,33 +210,33 @@ def get_prototypes(model, pos_samples, unlabeled_samples):
 
     pos_graph_embeddings = F.normalize(torch.cat(pos_graph_embeddings), dim=-1).numpy()  # shape: [num_molecules, hidden_dim]
 
-    reducer_2d = umap.UMAP(random_state=42)
-    umap_embeddings = reducer_2d.fit_transform(pos_graph_embeddings)
-
     # hierarchical cluster
     Z = linkage(pos_graph_embeddings, method='average', metric='cosine')
 
     # get the best cluster number of all positive samples
-    best_cluster_num, labels = try_multiple_cluster_combinations(Z, pos_graph_embeddings, args)
-    
+    best_cluster_num, labels, pos_graph_embeddings, pos_additives_names, Z = try_multiple_cluster_combinations(Z, pos_graph_embeddings, pos_additives_names, args)
+
+    reducer_2d = umap.UMAP(random_state=42)
+    umap_embeddings = reducer_2d.fit_transform(pos_graph_embeddings)
+
     # plot hierarchical cluster dendrogram
     plot_hierarchical_cluster_dendrogram(Z, pos_additives_names)
     # plot UMAP cluster distribution
-    plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings)
+    plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings, trial)
     # show the consistency analysis results
     if args.task == 'eval':
         show_gnn_fp_consistency_results(pos_additives_names, umap_embeddings)
 
-    additive_id_mapping = pd.read_csv('./V3/processed_data/additive_id_mapping.csv')
+    additive_id_mapping = pd.read_csv(f'./V3/processed_data/additive_id_mapping.csv')
     
-    pos_additives_ids = [int(i.item()) for i in pos_additives_names]
+    pos_additives_ids = [i for i in pos_additives_names]
     pos_additives_name = [additive_id_mapping.loc[additive_id_mapping['id'] == i,'name'].values for i in pos_additives_ids]
 
     prototypes_table = pd.DataFrame()
     prototypes_table['molecule_id'] = pos_additives_ids
     prototypes_table['prototypes'] = labels
     prototypes_table['molecule_name'] = pos_additives_name
-    prototypes_table.to_csv('./proto_table.csv', index=False)
+    prototypes_table.to_csv(f'./proto_table_trial_{trial}.csv', index=False)
 
     return prototypes_table
 
@@ -397,23 +397,6 @@ def main():
     # check and get the representation model checkpoint
     model = get_representation_model(file_path, pos_train_samples, pos_test_samples)
 
-    # get the prototypes table
-    if args.task == 'train':
-        prototypes_table = get_prototypes(model, all_pos_samples, unlabeled_samples) # get the prototypes during training process
-    
-    # train the prototype contrastive learning model
-    proto_train_samples = pos_train_samples + unl_train_samples
-    proto_test_samples = pos_test_samples + unl_test_samples
-    proto_train_loader = DataLoader(proto_train_samples, batch_size=args.pcl_batch_size, shuffle=True)
-    proto_test_loader = DataLoader(proto_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-
-    # training data
-    molecule_id = prototypes_table['molecule_id'].values.tolist()
-    proto_label = prototypes_table['prototypes'].values.tolist()
-    molecule_id = torch.tensor(molecule_id, dtype=torch.int)
-    proto_label = torch.tensor(proto_label, dtype=torch.int)
-
-
 
     total_sc_scores = []
     total_best_encoders = []
@@ -422,6 +405,23 @@ def main():
     total_best_labels = []
     total_best_proto_centroids = []
     for trial in tqdm(range(1, args.pcl_trials + 1), desc=f'Prototype contrastive learning trials...'):
+        # get the prototypes table
+        if args.task == 'train':
+            prototypes_table = get_prototypes(model, all_pos_samples, trial) # get the prototypes during training process
+        
+        # train the prototype contrastive learning model
+        proto_train_samples = pos_train_samples + unl_train_samples
+        proto_test_samples = pos_test_samples + unl_test_samples
+        proto_train_loader = DataLoader(proto_train_samples, batch_size=args.pcl_batch_size, shuffle=True)
+        proto_test_loader = DataLoader(proto_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+
+        # training data
+        molecule_id = prototypes_table['molecule_id'].values.tolist()
+        proto_label = prototypes_table['prototypes'].values.tolist()
+        molecule_id = torch.tensor(molecule_id, dtype=torch.int)
+        proto_label = torch.tensor(proto_label, dtype=torch.int)
+
+
         encoder = GINE(num_node_features=proto_train_samples[0].x.shape[1], num_edge_features=proto_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.pcl_hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)

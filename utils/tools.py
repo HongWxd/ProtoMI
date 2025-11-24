@@ -309,7 +309,7 @@ def imbalanced_weights(train_data, train_loader, epoch, device):
 
 def plot_PCL_Trials_SC(total_sc_scores, trials):
     plt.figure(figsize=(12, 5))
-    plt.plot(trials, total_sc_scores, marker='o', label='Silhoutte Score', color='tab:orange')
+    plt.plot(range(1, trials+1), total_sc_scores, marker='o', label='Silhoutte Score', color='tab:orange')
     plt.xlabel('PCL Trials')
     plt.ylabel('Silhoutte Core')
     plt.title(f'Prototye Contrastive Learning Trials vs Silhoutte Score')
@@ -375,24 +375,67 @@ def tanimoto_matrix(X):
     sim = intersection / union
     return sim
 
-def try_multiple_cluster_combinations(Z, all_embeddings, args):
+def try_multiple_cluster_combinations(Z, all_embeddings, pos_additives_names, args):
     possible_clusters = range(3, args.max_cluster+1)
     best_score = -1
     best_k = None
     best_labels = None
+    best_embeddings = None
+    best_names = None
+    best_Z = None
 
     for k in possible_clusters:
         cluster_labels = fcluster(Z, t=k, criterion='maxclust')
+
+        # filter the outliers in each cluster
+        filtered_embeddings, filtered_labels, filtered_indices = filter_cluster_outliers(all_embeddings, cluster_labels)
+
         try:
-            score = silhouette_score(all_embeddings, cluster_labels, metric='euclidean')
-            # print(f"k={k}, silhouette score={score:.4f}")
+            Z_filt = linkage(filtered_embeddings, method='average', metric='cosine')
+            score = silhouette_score(filtered_embeddings, filtered_labels, metric='euclidean')
             if score > best_score:
                 best_score = score
                 best_k = k
-                best_labels = cluster_labels 
+                best_labels = filtered_labels
+                best_embeddings = filtered_embeddings
+                best_names = np.array(pos_additives_names)[filtered_indices].tolist()
+                best_Z = Z_filt
         except Exception as e:
             print(f"k={k} failed: {e}")
 
     print(f"\n✅ best cluster number: {best_k}, average silhouette score: {best_score:.4f}")
 
-    return best_k, best_labels
+    return best_k, best_labels, best_embeddings, best_names, best_Z
+
+def filter_cluster_outliers(embeddings, cluster_labels, alpha=1.5):
+        filtered_embeddings = []
+        filtered_labels = []
+        filtered_indices = []
+
+        unique_clusters = np.unique(cluster_labels)
+
+        for cluster_id in unique_clusters:
+            idx = np.where(cluster_labels == cluster_id)[0]
+            cluster_emb = embeddings[idx]
+
+            if len(cluster_emb) < 2:
+                continue
+
+            centroid = np.mean(cluster_emb, axis=0)
+            distances = np.linalg.norm(cluster_emb - centroid, axis=1)
+
+            # threshold = mean + α * std
+            d_mean = distances.mean()
+            d_std = distances.std()
+            threshold = d_mean + alpha * d_std
+
+            mask = distances <= threshold
+
+            filtered_embeddings.append(cluster_emb[mask])
+            filtered_labels.append(cluster_labels[idx][mask])
+            filtered_indices.append(idx[mask])
+
+        filtered_embeddings = np.vstack(filtered_embeddings)
+        filtered_labels = np.concatenate(filtered_labels)
+        filtered_indices = np.concatenate(filtered_indices)
+        return filtered_embeddings, filtered_labels, filtered_indices
