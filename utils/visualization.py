@@ -85,4 +85,4 @@ def plot_cluster_distribution_UMAP(best_k, best_labels, embeddings, trial):
     plt.xlabel("UMAP-1")
     plt.ylabel("UMAP-2")
     plt.tight_layout()
-    plt.savefig(f"./V3/plots/positive_samples_umap_best_cluster_trial_{trial}.png", dpi=600)
+    plt.savefig(f"./result_files/positive_samples_umap_best_cluster_trial_{trial}.png", dpi=600)

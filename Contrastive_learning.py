@@ -219,13 +219,15 @@ def get_prototypes(model, pos_samples, trial):
     reducer_2d = umap.UMAP(random_state=42)
     umap_embeddings = reducer_2d.fit_transform(pos_graph_embeddings)
 
-    # plot hierarchical cluster dendrogram
-    plot_hierarchical_cluster_dendrogram(Z, pos_additives_names)
+    # # plot hierarchical cluster dendrogram
+    # plot_hierarchical_cluster_dendrogram(Z, pos_additives_names)
+
     # plot UMAP cluster distribution
     plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings, trial)
-    # show the consistency analysis results
-    if args.task == 'eval':
-        show_gnn_fp_consistency_results(pos_additives_names, umap_embeddings)
+
+    # # show the consistency analysis results
+    # if args.task == 'eval':
+    #     show_gnn_fp_consistency_results(pos_additives_names, umap_embeddings)
 
     additive_id_mapping = pd.read_csv(f'./V3/processed_data/additive_id_mapping.csv')
     
@@ -236,7 +238,7 @@ def get_prototypes(model, pos_samples, trial):
     prototypes_table['molecule_id'] = pos_additives_ids
     prototypes_table['prototypes'] = labels
     prototypes_table['molecule_name'] = pos_additives_name
-    prototypes_table.to_csv(f'./proto_table_trial_{trial}.csv', index=False)
+    prototypes_table.to_csv(f'./result_files/proto_table_trial_{trial}.csv', index=False)
 
     return prototypes_table
 
