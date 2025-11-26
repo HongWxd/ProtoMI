@@ -173,7 +173,7 @@ all_ids = torch.cat([pos_ids, unl_ids], dim=0)
 labels_df = pd.DataFrame()
 labels_df['id'] = all_ids.numpy()
 labels_df['label'] = proto_labels.numpy()
-labels_df.to_csv(f'./V3/processed_data/predicted_labels.csv', index=False)
+labels_df.to_csv(f'./result_files/predicted_labels.csv', index=False)
 
 
 reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine', random_state=42)
@@ -201,7 +201,7 @@ plt.ylabel('UMAP 2', fontsize=14)
 
 plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
-plt.savefig('./V3/plots/predict_result.png', dpi=600)
+plt.savefig('./result_files/predict_result.png', dpi=600)
 
 
 
