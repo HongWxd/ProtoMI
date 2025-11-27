@@ -20,7 +20,7 @@ from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from sklearn.metrics import silhouette_score
 
 
-
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 
 def one_hot_encoding(x, permitted_list):
     """
@@ -398,7 +398,10 @@ def try_multiple_cluster_combinations(Z, all_embeddings, pos_additives_names, ar
                 best_k = k
                 best_labels = filtered_labels
                 best_embeddings = filtered_embeddings
-                best_names = np.array(pos_additives_names)[filtered_indices].tolist()
+                if args.retrain_usl:
+                    best_names = None
+                else:
+                    best_names = np.array(pos_additives_names)[filtered_indices].tolist()
                 best_Z = Z_filt
         except Exception as e:
             print(f"k={k} failed: {e}")

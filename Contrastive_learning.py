@@ -61,7 +61,7 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 # prototypes configs
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
-parser.add_argument('--proto_epoch', type=int, default=500, help='Number of training epochs')
+parser.add_argument('--proto_epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
@@ -125,9 +125,11 @@ def unsupervised_training(pos_train_samples, pos_test_samples):
         model.eval()
         eval_loader = DataLoader(pos_train_samples, batch_size=args.usl_batch_size, shuffle=False)
         all_embeddings = []
+        pos_additives_names = []
         with torch.no_grad():
             for data in eval_loader:
                 data = data.to(device)
+                pos_additives_names += data.id
                 out = model(data.x, data.edge_index, data.edge_attr, data.batch)
                 all_embeddings.append(out.cpu())
 
@@ -137,7 +139,8 @@ def unsupervised_training(pos_train_samples, pos_test_samples):
         Z = linkage(all_embeddings, method='average', metric='cosine')
 
         # get the best cluster number of all positive samples
-        best_cluster_num, labels = try_multiple_cluster_combinations(Z, all_embeddings, args)
+        # best_cluster_num, labels = try_multiple_cluster_combinations(Z, all_embeddings, args)
+        best_k, labels, all_embeddings, _, _ = try_multiple_cluster_combinations(Z, all_embeddings, pos_additives_names, args)
         sil = silhouette_score(all_embeddings, labels, metric='cosine')
 
 
@@ -180,7 +183,7 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
             model, silhouette_scores = unsupervised_training(pos_train_samples, pos_test_samples)
             if silhouette_scores > best_sil_score:
                 best_sil_score = silhouette_scores
-                best_model = copy.deepcopy(model)
+                best_model = model
                 best_trial = trial + 1
         
         print(f'Best trial from unsupervised learning: {best_trial}')
@@ -214,6 +217,7 @@ def get_prototypes(model, pos_samples, trial):
     Z = linkage(pos_graph_embeddings, method='average', metric='cosine')
 
     # get the best cluster number of all positive samples
+    args.reretrain_usl = False
     best_cluster_num, labels, pos_graph_embeddings, pos_additives_names, Z = try_multiple_cluster_combinations(Z, pos_graph_embeddings, pos_additives_names, args)
 
     reducer_2d = umap.UMAP(random_state=42)
@@ -270,6 +274,7 @@ def update_proto_centroids(molecule_id, proto_label, encoder, projection, all_po
     proto_centroids = F.normalize(proto_centroids, dim=1)
 
     return proto_centroids
+
 
 def prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, proto_centroids):    
     encoder.train()
@@ -497,9 +502,9 @@ def main():
     plt.tight_layout()
     plt.savefig('./V3/plots/test_results.png', dpi=600)
 
-    torch.save(total_best_encoders[best_trial_idx].state_dict(), f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
-    torch.save(total_best_projections[best_trial_idx].state_dict(), f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
-    torch.save(total_best_proto_centroids[best_trial_idx], f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
+    torch.save(total_best_encoders[best_trial_idx].state_dict(), f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}.pth')
+    torch.save(total_best_projections[best_trial_idx].state_dict(), f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}.pth')
+    torch.save(total_best_proto_centroids[best_trial_idx], f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}.pth')
 
 
 if __name__=="__main__":

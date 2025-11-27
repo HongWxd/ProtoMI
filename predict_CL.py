@@ -51,7 +51,7 @@ parser.add_argument('--test_size', type=float, default=0.2, help='test set size'
 # prototypes configs
 parser.add_argument('--max_cluster', type=int, default=10, help='max cluster number')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature coefficient for prototypes')
-parser.add_argument('--proto_epoch', type=int, default=500, help='Number of training epochs')
+parser.add_argument('--proto_epoch', type=int, default=300, help='Number of training epochs')
 parser.add_argument('--r', type=int, default=10000, help='number of randomly select neg prototypes')
 parser.add_argument('--proto_training_types', type=str, default='Prototype contrastive learning', help='training_types')
 parser.add_argument('--proto_models', type=str, default='GINE', help='model name for PCL')
@@ -92,9 +92,9 @@ encoder = GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_featu
         hidden_channels=args.pcl_hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 projection = ProjectionHead_PCL(in_dim=args.pcl_hidden_channels).to(device)
-encoder.load_state_dict(torch.load(f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')) # load the checkpoints
-projection.load_state_dict(torch.load(f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')) # load the checkpoints
-proto_centroids = torch.load(f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}_r_{args.r}.pth')
+encoder.load_state_dict(torch.load(f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}.pth')) # load the checkpoints
+projection.load_state_dict(torch.load(f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}.pth')) # load the checkpoints
+proto_centroids = torch.load(f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}.pth')
 
 model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.usl_hidden_channels,
@@ -164,15 +164,15 @@ pos_proto_labels = pos_labels + 1
 emb_unl, unl_labels, unl_ids, unl_sc_score = get_embeddings(encoder, projection, unl_loader, proto_centroids)
 unl_proto_labels = unl_labels + 1
 
-print(f'Silhouette Score on Samples: {pos_sc_score}')
+print(f'Silhouette Score on Samples: {(pos_sc_score * len(pos_ids) + unl_sc_score * len(unl_ids))  / (len(pos_ids) + len(unl_ids))}')
 
 all_emb = torch.cat([emb_pos, emb_unl], dim=0)
 proto_labels = torch.cat([pos_proto_labels, unl_proto_labels], dim=0)
 all_ids = torch.cat([pos_ids, unl_ids], dim=0)
 
 labels_df = pd.DataFrame()
-labels_df['id'] = all_ids.numpy()
-labels_df['label'] = proto_labels.numpy()
+labels_df['id'] = unl_ids.numpy()
+labels_df['label'] = unl_proto_labels.numpy()
 labels_df.to_csv(f'./result_files/predicted_labels.csv', index=False)
 
 
