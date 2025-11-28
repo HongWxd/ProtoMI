@@ -68,6 +68,11 @@ print(f'Max positive SAScore: {max_pos_SAScore}, Min positive SAScore: {min_pos_
 filtered_samples = []
 for idx, row in predict_samples_data.iterrows():
     cid = row['cid']
+    smiles = row['SMILES']
+   
+    if '.' in smiles:
+        continue
+
     if cid < 100000000:
         filtered_samples.append(row)
 filtered_samples_df = pd.DataFrame(filtered_samples)
@@ -142,6 +147,8 @@ for idx, row in filtered_samples_df.iterrows():
 filtered_samples_df = pd.DataFrame(filtered_samples)
 
 print(f'After filtering by labile H: {len(filtered_samples_df)}')
+filtered_samples_df_without_commercial = filtered_samples_df.copy()
+filtered_samples_df_without_commercial.to_csv('./result_files/filtered_predicted_additives_without_commercial.csv', index=False)
 
 
 import requests
@@ -161,19 +168,19 @@ def is_commercial(smiles):
 
     return has_cas
 
-# # filter by commercial availability
-# filtered_samples = []
-# all_scs = []
-# for i, (idx, row) in zip(tqdm(range(len(filtered_samples_df))), filtered_samples_df.iterrows()):
-#     smiles = row['SMILES']
-#     commercial = is_commercial(smiles)
+# filter by commercial availability
+filtered_samples = []
+all_scs = []
+for i, (idx, row) in zip(tqdm(range(len(filtered_samples_df))), filtered_samples_df.iterrows()):
+    smiles = row['SMILES']
+    commercial = is_commercial(smiles)
 
-#     if commercial:
-#         filtered_samples.append(row)
-#     else:
-#         continue
+    if commercial:
+        filtered_samples.append(row)
+    else:
+        continue
 
-# filtered_samples_df = pd.DataFrame(filtered_samples)
-# print(f'After filtering by commercial: {len(filtered_samples_df)}')
+filtered_samples_df = pd.DataFrame(filtered_samples)
+print(f'After filtering by commercial: {len(filtered_samples_df)}')
 
 filtered_samples_df.to_csv('./result_files/filtered_predicted_additives.csv', index=False)
