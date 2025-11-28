@@ -45,7 +45,10 @@ for smiles in pos_smiles:
     logp = Crippen.MolLogP(mol)
     SAScore = sascorer.calculateScore(mol)
     pos_mw.append(mw)
-    pos_logp.append(logp)
+    if logp < -10:
+        continue
+    else:
+        pos_logp.append(logp)
     pos_SAScore.append(SAScore)
 
 
@@ -55,7 +58,10 @@ max_pos_logp = max(pos_logp)
 min_pos_logp = min(pos_logp)
 max_pos_SAScore = max(pos_SAScore)
 min_pos_SAScore = min(pos_SAScore)
-# print(f'Max positive MW: {max_pos_mw}, Min positive MW: {min_pos_mw}')
+print(f'Max positive MW: {max_pos_mw}, Min positive MW: {min_pos_mw}')
+print(f'Max positive logP: {max_pos_logp}, Min positive logP: {min_pos_logp}')
+print(f'Max positive SAScore: {max_pos_SAScore}, Min positive SAScore: {min_pos_SAScore}')
+
 
 
 # filter the predicted samples by abnormal cid
@@ -155,19 +161,19 @@ def is_commercial(smiles):
 
     return has_cas
 
-# filter by labile H
-filtered_samples = []
-all_scs = []
-for i, (idx, row) in zip(tqdm(range(len(filtered_samples_df))), filtered_samples_df.iterrows()):
-    smiles = row['SMILES']
-    commercial = is_commercial(smiles)
+# # filter by commercial availability
+# filtered_samples = []
+# all_scs = []
+# for i, (idx, row) in zip(tqdm(range(len(filtered_samples_df))), filtered_samples_df.iterrows()):
+#     smiles = row['SMILES']
+#     commercial = is_commercial(smiles)
 
-    if commercial:
-        filtered_samples.append(row)
-    else:
-        continue
+#     if commercial:
+#         filtered_samples.append(row)
+#     else:
+#         continue
 
-filtered_samples_df = pd.DataFrame(filtered_samples)
-print(f'After filtering by commercial: {len(filtered_samples_df)}')
+# filtered_samples_df = pd.DataFrame(filtered_samples)
+# print(f'After filtering by commercial: {len(filtered_samples_df)}')
 
 filtered_samples_df.to_csv('./result_files/filtered_predicted_additives.csv', index=False)
