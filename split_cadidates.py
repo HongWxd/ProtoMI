@@ -62,22 +62,31 @@ predict_locations_df = predict_locations_df.sort_values("prototypes").reset_inde
 predict_locations_df = predict_locations_df[~predict_locations_df["ID"].isin([-1, -2, -3, -4, -5, -6, -7])]
 predict_locations_df.to_csv('./result_files/predicted_locations.csv', index=False)
 
-# umap_df = pd.DataFrame()
-# UMAP1 = predict_locations_df['UMAP1']
-# UMAP2 = predict_locations_df['UMAP2']
-# umap_df['UMAP1'] = UMAP1
-# umap_df['UMAP2'] = UMAP2
-# umap_df['Prototype'] = predict_locations_df['prototypes'].values
+umap_df = pd.DataFrame()
+UMAP1 = predict_locations_df['UMAP1']
+UMAP2 = predict_locations_df['UMAP2']
+umap_df['UMAP1'] = UMAP1
+umap_df['UMAP2'] = UMAP2
+umap_df['Prototype'] = predict_locations_df['prototypes'].values
 
-# plt.figure(figsize=(10, 8))
-# sns.scatterplot(data=umap_df, x='UMAP1', y='UMAP2', hue='Prototype', palette='tab10', s=20, edgecolor=None, alpha=0.7)
+plt.figure(figsize=(10, 8))
+sns.scatterplot(data=umap_df, x='UMAP1', y='UMAP2', hue='Prototype', palette='tab10', s=50, edgecolor=None, alpha=0.7)
+plt.scatter(
+    positive_locations_df['UMAP1'].values,
+    positive_locations_df['UMAP2'].values,
+    c='red',
+    s=40,
+    alpha=0.7,
+    marker='*',
+    label='Reported Molecules',
+    edgecolors='black'
+)
+plt.title('UMAP of Graph Embeddings by Prototype', fontsize=16)
+plt.xlabel('UMAP 1', fontsize=14)
+plt.ylabel('UMAP 2', fontsize=14)
 
-# plt.title('UMAP of Graph Embeddings by Prototype', fontsize=16)
-# plt.xlabel('UMAP 1', fontsize=14)
-# plt.ylabel('UMAP 2', fontsize=14)
-
-# plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
-# plt.tight_layout()
-# plt.savefig('./result_files/predict_result_all.png', dpi=1000)
+plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+plt.savefig('./result_files/predict_result_all.png', dpi=600)
 
 

@@ -31,6 +31,7 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
 parser.add_argument('--ucl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
+parser.add_argument('--save_path', type=str, default='checkpoints', help='')
 
 # graph augmentation configs
 parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
@@ -78,8 +79,8 @@ def load_data(data_path):
     unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
     return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples
 
-data_path = './data/all_data.pkl'
-file_path = f"./checkpoints/{args.training_types}_model_{args.models}.pth"
+data_path = './data/all_data_20260206.pkl'
+file_path = f"./{args.save_path}/{args.training_types}_model_{args.models}.pth"
 
 # load data
 positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
@@ -92,9 +93,9 @@ encoder = GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_featu
         hidden_channels=args.pcl_hidden_channels,
         num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
 projection = ProjectionHead_PCL(in_dim=args.pcl_hidden_channels).to(device)
-encoder.load_state_dict(torch.load(f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}.pth')) # load the checkpoints
-projection.load_state_dict(torch.load(f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}.pth')) # load the checkpoints
-proto_centroids = torch.load(f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}.pth')
+encoder.load_state_dict(torch.load(f'./{args.save_path}/encoder_{args.proto_models}_epoch_{args.proto_epoch}.pth')) # load the checkpoints
+projection.load_state_dict(torch.load(f'./{args.save_path}/projection_{args.proto_models}_epoch_{args.proto_epoch}.pth')) # load the checkpoints
+proto_centroids = torch.load(f'./{args.save_path}/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}.pth')
 
 model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.usl_hidden_channels,
@@ -171,9 +172,9 @@ proto_labels = torch.cat([pos_proto_labels, unl_proto_labels], dim=0)
 all_ids = torch.cat([pos_ids, unl_ids], dim=0)
 
 labels_df = pd.DataFrame()
-labels_df['id'] = unl_ids.numpy()
-labels_df['label'] = unl_proto_labels.numpy()
-labels_df.to_csv(f'./result_files/predicted_labels.csv', index=False)
+labels_df['id'] = all_ids.numpy()
+labels_df['label'] = proto_labels.numpy()
+labels_df.to_csv(f'./result_files_20260206/predicted_labels.csv', index=False)
 
 
 reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine', random_state=42)
@@ -181,6 +182,7 @@ emb_2d = reducer.fit_transform(all_emb.numpy())
 
 
 umap_df = pd.DataFrame(emb_2d, columns=['UMAP1', 'UMAP2'])
+umap_df['ID'] = all_ids.numpy()
 umap_df['Prototype'] = proto_labels
 
 plt.figure(figsize=(10, 8))
@@ -201,7 +203,8 @@ plt.ylabel('UMAP 2', fontsize=14)
 
 plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
-plt.savefig('./result_files/predict_result.png', dpi=600)
+plt.savefig('./result_files_20260206/predict_result.png', dpi=600)
 
+print(umap_df)
 
 

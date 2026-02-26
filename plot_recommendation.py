@@ -128,25 +128,6 @@ def get_embeddings(encoder, projection, dataloader, proto_centroids):
     return all_embeddings, all_ids
 
 
-def get_proto_center_embeddings(encoder, projection, proto_centroids):
-    encoder.eval()
-    projection.eval()
-    all_embeddings = []
-
-    with torch.no_grad():
-        proto_centroids = proto_centroids.to(device)
-
-        query = encoder(proto_centroids.x, proto_centroids.edge_index, proto_centroids.edge_attr, proto_centroids.batch)
-        query = projection(query)
-        query = F.normalize(query, dim=-1)
-        all_embeddings.append(query.cpu())
-
-    all_embeddings = torch.cat(all_embeddings, dim=0)
-    all_ids = torch.cat(all_ids, dim=0)
-
-    return all_embeddings
-
-
 emb_pos, pos_ids = get_embeddings(model, projection_head, pos_loader, proto_centroids)
 emb_unl, unl_ids = get_embeddings(encoder, projection, unl_loader, proto_centroids)
 

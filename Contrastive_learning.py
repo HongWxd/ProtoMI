@@ -42,6 +42,8 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
 parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
+parser.add_argument('--save_path', type=str, default='checkpoints_top35', help='')
+
 
 # graph augmentation configs
 parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
@@ -69,7 +71,7 @@ parser.add_argument('--pcl_hidden_channels', type=int, default=256, help='Number
 parser.add_argument('--pcl_learning_rate', type=float, default=0.00001, help='Learning rate')
 parser.add_argument('--pcl_batch_size', type=int, default=1024, help='Batch size for training')
 parser.add_argument('--threshold', type=float, default=0.3, help='threshold')
-parser.add_argument('--topk', type=int, default=25, help='top k samples for each prototype')
+parser.add_argument('--topk', type=int, default=35, help='top k samples for each prototype')
 parser.add_argument('--pcl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 
 
@@ -189,7 +191,7 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
         print(f'Best trial from unsupervised learning: {best_trial}')
         print(f'Best silhouette score from unsupervised learning: {best_sil_score}')
 
-        torch.save(best_model.state_dict(), f'./checkpoints/{args.training_types}_model_{args.models}.pth')
+        torch.save(best_model.state_dict(), f'./{args.save_path}/{args.training_types}_model_{args.models}.pth')
 
     return best_model
 
@@ -242,7 +244,7 @@ def get_prototypes(model, pos_samples, trial):
     prototypes_table['molecule_id'] = pos_additives_ids
     prototypes_table['prototypes'] = labels
     prototypes_table['molecule_name'] = pos_additives_name
-    prototypes_table.to_csv(f'./result_files/proto_table_trial_{trial}.csv', index=False)
+    prototypes_table.to_csv(f'./result_files_top35/proto_table_trial_{trial}.csv', index=False)
 
     return prototypes_table
 
@@ -395,7 +397,7 @@ def prototype_contrastive_eval(encoder, projection, proto_test_loader, proto_cen
 
 def main():
     data_path = './data/all_data.pkl'
-    file_path = f"./checkpoints/{args.training_types}_model_{args.models}.pth"
+    file_path = f"./{args.save_path}/{args.training_types}_model_{args.models}.pth"
 
     # load data
     positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
@@ -502,9 +504,9 @@ def main():
     plt.tight_layout()
     plt.savefig('./V3/plots/test_results.png', dpi=600)
 
-    torch.save(total_best_encoders[best_trial_idx].state_dict(), f'./checkpoints/encoder_{args.proto_models}_epoch_{args.proto_epoch}.pth')
-    torch.save(total_best_projections[best_trial_idx].state_dict(), f'./checkpoints/projection_{args.proto_models}_epoch_{args.proto_epoch}.pth')
-    torch.save(total_best_proto_centroids[best_trial_idx], f'./checkpoints/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}.pth')
+    torch.save(total_best_encoders[best_trial_idx].state_dict(), f'./{args.save_path}/encoder_{args.proto_models}_epoch_{args.proto_epoch}.pth')
+    torch.save(total_best_projections[best_trial_idx].state_dict(), f'./{args.save_path}/projection_{args.proto_models}_epoch_{args.proto_epoch}.pth')
+    torch.save(total_best_proto_centroids[best_trial_idx], f'./{args.save_path}/proto_centroids_{args.proto_models}_epoch_{args.proto_epoch}.pth')
 
 
 if __name__=="__main__":
