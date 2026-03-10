@@ -40,9 +40,9 @@ parser.add_argument('--models', type=str, default='GINE', help='Training models'
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
-parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
+parser.add_argument('--retrain_usl', type=bool, default=True, help='retrain the usl models')
 parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
-parser.add_argument('--save_path', type=str, default='checkpoints_top35', help='')
+parser.add_argument('--save_path', type=str, default='checkpoints_260310', help='')
 
 
 # graph augmentation configs
@@ -399,12 +399,16 @@ def main():
     data_path = './data/all_data.pkl'
     file_path = f"./{args.save_path}/{args.training_types}_model_{args.models}.pth"
 
+    if not os.path.exists(args.save_path):
+        os.makedirs(args.save_path)
+
     # load data
     positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
     all_pos_samples = pos_train_samples + pos_test_samples
 
     # check and get the representation model checkpoint
-    model = get_representation_model(file_path, pos_train_samples, pos_test_samples)
+    model = get_representation_model(file_path, positive_samples_126, [])
+    # model = get_representation_model(file_path, pos_train_samples, pos_test_samples)
 
 
     total_sc_scores = []

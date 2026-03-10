@@ -79,7 +79,7 @@ def load_data(data_path):
     unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
     return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples
 
-data_path = './data/all_data_20260206.pkl'
+data_path = './data/all_data.pkl'
 file_path = f"./{args.save_path}/{args.training_types}_model_{args.models}.pth"
 
 # load data
