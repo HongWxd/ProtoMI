@@ -40,9 +40,9 @@ parser.add_argument('--models', type=str, default='GINE', help='Training models'
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
-parser.add_argument('--retrain_usl', type=bool, default=True, help='retrain the usl models')
+parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
 parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
-parser.add_argument('--save_path', type=str, default='checkpoints_260310', help='')
+parser.add_argument('--save_path', type=str, default='checkpoints', help='')
 
 
 # graph augmentation configs
@@ -173,12 +173,16 @@ def load_data(data_path):
 
 def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     if os.path.exists(file_path) and args.retrain_usl == False:
+        print(f"Loading the pretrained model from {file_path}...")
+
         model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
             hidden_channels=args.usl_hidden_channels,
             num_classes=args.num_classes, dropout=args.dropout, args=args).to(device)
         model.load_state_dict(torch.load(file_path)) # load the checkpoints
         best_model = model
     else:
+        print("No pretrained model found. Start unsupervised training...")
+
         best_model = None
         best_sil_score = -1
         for trial in tqdm(range(args.usl_trials), desc=f'Unsupervised learning trials...'):
@@ -196,11 +200,12 @@ def get_representation_model(file_path, pos_train_samples, pos_test_samples):
     return best_model
 
 
-def get_prototypes(model, pos_samples, trial):
+def get_prototypes(model, pos_samples, trial, args):
     # get the original cluster in the positive samples
-    model.eval()
     projection_head = ProjectionHead(in_dim=args.usl_hidden_channels).to(device)
     pos_sample_loader = DataLoader(pos_samples, batch_size=args.usl_batch_size, shuffle=False)
+    model.eval()
+    projection_head.eval()
     pos_graph_embeddings = []
     pos_additives_names = []
 
@@ -229,7 +234,7 @@ def get_prototypes(model, pos_samples, trial):
     # plot_hierarchical_cluster_dendrogram(Z, pos_additives_names)
 
     # plot UMAP cluster distribution
-    plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings, trial)
+    plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings, trial, args)
 
     # # show the consistency analysis results
     # if args.task == 'eval':
@@ -244,7 +249,7 @@ def get_prototypes(model, pos_samples, trial):
     prototypes_table['molecule_id'] = pos_additives_ids
     prototypes_table['prototypes'] = labels
     prototypes_table['molecule_name'] = pos_additives_name
-    prototypes_table.to_csv(f'./result_files_top35/proto_table_trial_{trial}.csv', index=False)
+    prototypes_table.to_csv(f'./{args.save_path}/proto_table_trial_{trial}.csv', index=False)
 
     return prototypes_table
 
@@ -399,15 +404,18 @@ def main():
     data_path = './data/all_data.pkl'
     file_path = f"./{args.save_path}/{args.training_types}_model_{args.models}.pth"
 
-    if not os.path.exists(args.save_path):
-        os.makedirs(args.save_path)
+    if not os.path.exists(f"./{args.save_path}"):
+        os.makedirs(f"./{args.save_path}")
 
     # load data
+    print("Loading data...")
     positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(data_path)
     all_pos_samples = pos_train_samples + pos_test_samples
+    print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
 
     # check and get the representation model checkpoint
-    model = get_representation_model(file_path, positive_samples_126, [])
+    print("Getting the representation model...")
+    model = get_representation_model(file_path, pos_train_samples, pos_test_samples)
     # model = get_representation_model(file_path, pos_train_samples, pos_test_samples)
 
 
@@ -420,7 +428,7 @@ def main():
     for trial in tqdm(range(1, args.pcl_trials + 1), desc=f'Prototype contrastive learning trials...'):
         # get the prototypes table
         if args.task == 'train':
-            prototypes_table = get_prototypes(model, all_pos_samples, trial) # get the prototypes during training process
+            prototypes_table = get_prototypes(model, all_pos_samples, trial, args) # get the prototypes during training process
         
         # train the prototype contrastive learning model
         proto_train_samples = pos_train_samples + unl_train_samples

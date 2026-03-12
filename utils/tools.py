@@ -392,7 +392,7 @@ def try_multiple_cluster_combinations(Z, all_embeddings, pos_additives_names, ar
 
         try:
             Z_filt = linkage(filtered_embeddings, method='average', metric='cosine')
-            score = silhouette_score(filtered_embeddings, filtered_labels, metric='euclidean')
+            score = silhouette_score(filtered_embeddings, filtered_labels, metric='cosine')
             if score > best_score:
                 best_score = score
                 best_k = k
