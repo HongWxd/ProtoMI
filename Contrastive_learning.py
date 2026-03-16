@@ -464,6 +464,9 @@ def main():
                 proto_centroids = new_proto_centroids
             else:
                 proto_centroids = 0.999 * proto_centroids + 0.001 * new_proto_centroids
+            
+            torch.save(proto_centroids, f"/data/hwx/boron/prototype_checkpoints/proto_trial_{trial}_epoch_{epoch}.pth")
+            print(f'Prototypes for trial {trial} epoch {epoch} are saved.')
 
             # training
             encoder, projection, avg_epoch_train_loss = prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_train_loader, proto_centroids)
