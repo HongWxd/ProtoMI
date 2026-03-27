@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from utils.graph_augmentation import Graph_Augmentation_Helper
 from sklearn.model_selection import train_test_split
+from collections import Counter
 
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
@@ -31,7 +32,7 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
 parser.add_argument('--ucl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
-parser.add_argument('--save_path', type=str, default='checkpoints', help='')
+parser.add_argument('--save_path', type=str, default='checkpoints_origin_backup', help='')
 
 # graph augmentation configs
 parser.add_argument('--aug_types', type=str, default='all', help='augmentation types')
@@ -165,6 +166,13 @@ pos_proto_labels = pos_labels + 1
 emb_unl, unl_labels, unl_ids, unl_sc_score = get_embeddings(encoder, projection, unl_loader, proto_centroids)
 unl_proto_labels = unl_labels + 1
 
+# id_list = unl_ids.numpy().tolist()
+# counter = Counter(id_list)
+
+# multi = [k for k, v in counter.items() if v > 1]
+
+# print(f"重复出现的分子数: {len(multi)}")
+
 print(f'Silhouette Score on Samples: {(pos_sc_score * len(pos_ids) + unl_sc_score * len(unl_ids))  / (len(pos_ids) + len(unl_ids))}')
 
 all_emb = torch.cat([emb_pos, emb_unl], dim=0)
@@ -174,7 +182,7 @@ all_ids = torch.cat([pos_ids, unl_ids], dim=0)
 labels_df = pd.DataFrame()
 labels_df['id'] = all_ids.numpy()
 labels_df['label'] = proto_labels.numpy()
-labels_df.to_csv(f'./result_files_20260206/predicted_labels.csv', index=False)
+# labels_df.to_csv(f'./result_files/predicted_labels.csv', index=False)
 
 
 reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine', random_state=42)
@@ -203,7 +211,7 @@ plt.ylabel('UMAP 2', fontsize=14)
 
 plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
-plt.savefig('./result_files_20260206/predict_result.png', dpi=600)
+# plt.savefig('./result_files_20260206/predict_result.png', dpi=600)
 
 print(umap_df)
 
