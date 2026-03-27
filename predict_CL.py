@@ -13,6 +13,9 @@ import seaborn as sns
 from utils.graph_augmentation import Graph_Augmentation_Helper
 from sklearn.model_selection import train_test_split
 from collections import Counter
+import numpy as np
+from collections import Counter
+from scipy.stats import mannwhitneyu
 
 
 parser = argparse.ArgumentParser(description="Train a GCN model")
@@ -214,5 +217,3 @@ plt.tight_layout()
 # plt.savefig('./result_files_20260206/predict_result.png', dpi=600)
 
 print(umap_df)
-
-
