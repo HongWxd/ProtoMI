@@ -42,7 +42,7 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
 parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
-parser.add_argument('--save_path', type=str, default='checkpoints', help='')
+parser.add_argument('--save_path', type=str, default='checkpoints_no_decor_loss', help='')
 
 
 # graph augmentation configs
@@ -326,7 +326,7 @@ def prototype_contrastive_training(epoch, encoder, projection, optimizer, proto_
         proto_sim = proto_centroids @ proto_centroids.t()
         decor_loss = ((proto_sim - torch.eye(num_prototypes, device=proto_sim.device)) ** 2).mean()
 
-        loss = proto_loss + decor_loss
+        loss = proto_loss
 
         optimizer.zero_grad()
         loss.backward()

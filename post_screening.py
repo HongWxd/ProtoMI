@@ -16,9 +16,9 @@ from rdkit.Contrib.SA_Score import sascorer
 with open('./V3/processed_data/additives.json', 'r') as f:
     positive_data = json.load(f)
 
-prototypes_data = pd.read_csv('./result_files_top35/proto_table_trial_2.csv')
+prototypes_data = pd.read_csv('./result_files/proto_table_trial_7.csv')
 searching_space = pd.read_csv('./data/searching_space_data_V2.csv')
-predict_labels = pd.read_csv('./result_files_top35/predicted_labels.csv')
+predict_labels = pd.read_csv('./result_files/predicted_labels.csv')
 
 
 # get all predict samples
@@ -149,7 +149,7 @@ filtered_samples_df = pd.DataFrame(filtered_samples)
 
 print(f'After filtering by labile H: {len(filtered_samples_df)}')
 filtered_samples_df_without_commercial = filtered_samples_df.copy()
-filtered_samples_df_without_commercial.to_csv('./result_files_top35/filtered_predicted_additives_without_commercial.csv', index=False)
+# filtered_samples_df_without_commercial.to_csv('./result_files_top35/filtered_predicted_additives_without_commercial.csv', index=False)
 
 
 
@@ -183,7 +183,7 @@ for i, (idx, row) in zip(tqdm(range(len(filtered_samples_df))), filtered_samples
 filtered_samples_df = pd.DataFrame(filtered_samples)
 print(f'After filtering by commercial: {len(filtered_samples_df)}')
 
-filtered_samples_df.to_excel('./result_files_top35/filtered_predicted_additives.xlsx', index=False)
+# filtered_samples_df.to_excel('./result_files_top35/filtered_predicted_additives.xlsx', index=False)
 
 
 
