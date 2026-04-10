@@ -163,7 +163,7 @@ def get_embeddings(encoder, projection, dataloader, proto_centroids):
 
     return all_embeddings, all_labels, all_ids, sc_score
 
-emb_pos, pos_labels, pos_ids, pos_sc_score = get_embeddings(model, projection_head, pos_loader, proto_centroids)
+emb_pos, pos_labels, pos_ids, pos_sc_score = get_embeddings(encoder, projection, pos_loader, proto_centroids)
 pos_proto_labels = pos_labels + 1
 
 emb_unl, unl_labels, unl_ids, unl_sc_score = get_embeddings(encoder, projection, unl_loader, proto_centroids)
@@ -175,7 +175,7 @@ unl_proto_labels = unl_labels + 1
 # multi = [k for k, v in counter.items() if v > 1]
 
 # print(f"重复出现的分子数: {len(multi)}")
-
+print('Positive samples remain:', len(pos_ids))
 print(f'Silhouette Score on Samples: {(pos_sc_score * len(pos_ids) + unl_sc_score * len(unl_ids))  / (len(pos_ids) + len(unl_ids))}')
 
 all_emb = torch.cat([emb_pos, emb_unl], dim=0)
@@ -199,8 +199,8 @@ umap_df['Prototype'] = proto_labels
 plt.figure(figsize=(10, 8))
 sns.scatterplot(data=umap_df, x='UMAP1', y='UMAP2', hue='Prototype', palette='tab10', s=50, edgecolor=None, alpha=0.7)
 plt.scatter(
-    umap_df['UMAP1'].values[:756],
-    umap_df['UMAP2'].values[:756],
+    umap_df['UMAP1'].values[:len(pos_ids)],
+    umap_df['UMAP2'].values[:len(pos_ids)],
     c='red',
     s=40,
     alpha=0.7,
@@ -214,6 +214,6 @@ plt.ylabel('UMAP 2', fontsize=14)
 
 plt.legend(title='Prototype', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
-# plt.savefig('./result_files_20260206/predict_result.png', dpi=600)
+plt.savefig('./predict_result.png', dpi=600)
 
 print(umap_df)

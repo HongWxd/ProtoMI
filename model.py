@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn import Linear, Dropout, Sequential, ReLU, MultiheadAttention, LayerNorm, BatchNorm1d
 from torch_geometric.nn import GraphNorm
 from torch_geometric.nn import GCNConv, GINEConv, global_mean_pool
-from layers.attention import DAN, DANLayer
+
 
 class GCN(torch.nn.Module):
     def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
