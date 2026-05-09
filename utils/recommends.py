@@ -31,6 +31,7 @@ class Recommender():
         self.unl_loader = unl_loader
         self.single_sample = next(iter(unl_loader)).to_data_list()[0]
         self.device = args.device
+        self.recommend_model = args.recommend_model
 
 
         self.PCL_encoder, self.PCL_projection, self.USL_encoder, self.USL_projection, self.proto_centroids = self.prepare_model()
@@ -42,8 +43,8 @@ class Recommender():
         hidden_channels=self.pcl_hidden_channels,
         num_classes=self.num_classes, dropout=self.dropout).to(self.device)
         PCL_projection = ProjectionHead_PCL(in_dim=self.pcl_hidden_channels).to(self.device)
-        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
-        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
+        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
+        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
 
 
         proto_centroids = torch.load(f'{self.save_path}/proto_centroids.pth')
@@ -76,7 +77,7 @@ class Recommender():
                 query = self.PCL_projection(query)
                 query = F.normalize(query, dim=-1)
 
-                if self.method == 'random':
+                if self.method == 'random' or self.method == 'morgan':
                     all_embeddings.append(query.cpu())
                     all_labels.append((-1) * torch.ones(query.size(0), dtype=torch.long))
                     all_ids.append(data.id.cpu())
@@ -110,7 +111,7 @@ class Recommender():
         if self.method == 'full_model':
             # calculate silhouette score
             sc_score = silhouette_score(all_embeddings, all_labels, metric='cosine')
-        elif self.method == 'random':
+        elif self.method == 'random' or self.method == 'morgan':
             sc_score = None
 
         return all_embeddings, all_labels, all_ids, sc_score

@@ -1,3 +1,4 @@
 Method,After screening number,Prototype similarity ↑,Prototype coverage ↑,Assignment entropy ↑,Candidate diversity ↑,Post-screening survival ↑,Silhouette ↑
-Random selection,647,0.5217 ± 0.1478,7/7,0.5297,0.7775,2.1006%,0.5965
 Full model,70,0.7907 ± 0.0300,5/7,0.7229,0.8904,0.2273%,0.9762
+Random selection,647,0.5217 ± 0.1478,7/7,0.5297,0.7775,2.1006%,0.5965
+Morgan fingerprints,1598,0.4971 ± 0.1772,7/7,0.8369,0.7417,5.1883%,0.4084

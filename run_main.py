@@ -15,6 +15,7 @@ from utils.USL import USL
 from utils.PCL import PCL
 from rdkit.Chem import DataStructs
 from utils.tools import mol_to_fp
+from tqdm import tqdm
 
 warnings.filterwarnings('ignore')
 
@@ -24,6 +25,9 @@ parser.add_argument('--method', type=str, default='full_model', help='recommenda
 parser.add_argument('--data_path', type=str, default='./data/all_data.pkl', help='Path to the preprocessed data')
 parser.add_argument('--save_path', type=str, default='checkpoints_origin_backup', help='')
 parser.add_argument('--device', type=str, default='cuda:7' if torch.cuda.is_available() else 'cpu', help='Device to use for training')
+parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data_V2.csv', help='Path to the CSV file containing the searching space data')
+parser.add_argument('--additive_json_path', type=str, default='./V3/processed_data/additives.json', help='Path to the JSON file containing additive data')
+
 
 
 # baseline configs
@@ -85,16 +89,15 @@ parser.add_argument('--use_topk', type=bool, default=True, help='Whether to acti
 
 # post-screening configs
 parser.add_argument('--save_molecules', type=bool, default=True, help='Whether to save the recommended molecules after post-screening')
-parser.add_argument('--additive_json_path', type=str, default='./V3/processed_data/additives.json', help='Path to the JSON file containing additive data')
-parser.add_argument('--best_prototype_path', type=str, default='./result_files/proto_table_trial_7.csv', help='Path to the CSV file containing the best prototypes')
-parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data_V2.csv', help='Path to the CSV file containing the searching space data')
-parser.add_argument('--post-screening_output_path', type=str, default='./outputs/', help='Path to the post-screening output file')
+# parser.add_argument('--best_prototype_path', type=str, default='./result_files/proto_table_trial_7.csv', help='Path to the CSV file containing the best prototypes')
+parser.add_argument('--post_screening_output_path', type=str, default='./outputs/', help='Path to the post-screening output file')
+parser.add_argument('--recommend_model', type=str, default='full_model', help='')
 
 
 
 args = parser.parse_args()
 
-
+# random recommendation baseline
 def random_recommendation(unlabeled_samples, random_state):
     # random recommend samples
     random.seed(random_state)
@@ -104,16 +107,13 @@ def random_recommendation(unlabeled_samples, random_state):
 
     return random_loader
 
-
-def morgan_recommendation(positive_samples, unlabeled_samples):
-    print(positive_samples[:5])
-
-
-    unl_fps = [mol_to_fp(Chem.MolFromSmiles(s)) for s in unlabeled_samples]
-    pos_fps = [mol_to_fp(Chem.MolFromSmiles(s)) for s in positive_samples]
+# morgan fingerprint recomendation baseline
+def morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph):
+    unl_fps = [mol_to_fp(Chem.MolFromSmiles(s['smiles'])) for s in tqdm(unlabeled_samples) if Chem.MolFromSmiles(s['smiles']) is not None]
+    pos_fps = [mol_to_fp(Chem.MolFromSmiles(s)) for s in tqdm(positive_samples) if Chem.MolFromSmiles(s) is not None]
 
     similarity_scores = []
-    for fp in unl_fps:
+    for fp in tqdm(unl_fps, desc='Calculating the tanimoto similarity...'):
         sims = [DataStructs.TanimotoSimilarity(fp, pfp) for pfp in pos_fps]
         similarity_scores.append(np.mean(sims))
 
@@ -121,9 +121,11 @@ def morgan_recommendation(positive_samples, unlabeled_samples):
 
     top_idx = np.argsort(similarity_scores)[-args.num_select:]
     selected_samples = [unlabeled_samples[i] for i in top_idx]
+    selected_ids = {s['id'] for s in selected_samples}
+    recommend_unl_samples = [sample for sample in tqdm(unl_samples_graph) if sample.id in selected_ids]
 
-    morgan_loader = DataLoader(selected_samples, batch_size=args.pcl_batch_size, shuffle=False)
-
+    morgan_loader = DataLoader(recommend_unl_samples, batch_size=args.pcl_batch_size, shuffle=False)
+    
     return morgan_loader
 
 
@@ -131,31 +133,38 @@ if __name__ == '__main__':
     if not os.path.exists(f"./{args.save_path}"):
         os.makedirs(f"./{args.save_path}")
 
-    ### load data
-    print("Loading data...")
-    positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
-    all_pos_samples = pos_train_samples + pos_test_samples
-    pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-    unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-    print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
-
-
 
     ### recommendation method selection and model training
     if args.method == 'random':
+        print("Loading data...")
+        _, unlabeled_samples, _, _, _, _ = load_data(args)
+
         print('Random recommendation is selected. No model will be trained.')
         unl_loader = random_recommendation(unlabeled_samples, args.random_state)
         pos_loader = None
 
     elif args.method == 'morgan':
+        print("Loading data...")
+        positive_samples, unlabeled_samples, unl_samples_graph = load_data(args)
+
         print('Morgan fingerprint-based recommendation is selected. No model will be trained.')
-        unl_loader = morgan_recommendation(positive_samples_126, unlabeled_samples)
+        unl_loader = morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph)
         pos_loader = None
 
     elif args.method == 'full_model':
+        ### load data
+        print("Loading data...")
+        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
         print('Model-based recommendation is selected. Start training the models and doing recommendation.')
-        # training the unsupervised learning model (USL)
         print("Getting the representation model...")
+
+        all_pos_samples = pos_train_samples + pos_test_samples
+        pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+        unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+        print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
+
+        # training the unsupervised learning model (USL)
         usl = USL(args)
         usl_encoder = usl.get_representation_model(pos_train_samples, pos_test_samples)
 

@@ -160,14 +160,36 @@ class MoleculeDataset(Dataset):
 
 
 def load_data(args):
-    # data preparation
-    with open(args.data_path, 'rb') as f:
-        all_data = pickle.load(f)
+    if args.method == 'morgan':
+        # data preparation for graph data
+        with open(args.data_path, 'rb') as f:
+            all_data = pickle.load(f)
 
-    positive_samples = all_data[:126] # number of positive samples
-    unlabeled_samples = all_data[126:]
+        unlabeled_samples_graph = all_data[126:]
 
-    graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
-    pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()
-    unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
-    return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples
+        # load smiles data for Morgan fingerprint baseline
+        with open(args.additive_json_path, 'r') as f:
+            positive_data = json.load(f)
+
+        searching_space = pd.read_csv(args.searching_space_path)
+
+        positive_samples = []
+        for _, v in positive_data.items():
+            positive_samples.append(v['smiles'])
+        
+        unlabeled_samples = [{'id': int(id), 'smiles': smile} for id, smile in zip(searching_space['cid'].values.tolist(), searching_space['SMILES'].values.tolist())]
+
+        return positive_samples, unlabeled_samples, unlabeled_samples_graph
+
+    else:
+        # data preparation for graph data
+        with open(args.data_path, 'rb') as f:
+            all_data = pickle.load(f)
+
+        positive_samples = all_data[:126] # number of positive samples
+        unlabeled_samples = all_data[126:]
+
+        graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
+        pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()
+        unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
+        return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples

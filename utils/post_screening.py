@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import matplotlib.pyplot as plt
@@ -5,6 +6,7 @@ import numpy as np
 import pandas as pd
 import json
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 from rdkit.Chem import Crippen
@@ -24,7 +26,7 @@ class PostScreening():
         with open(args.additive_json_path, 'r') as f:
             self.positive_data = json.load(f)
 
-        self.prototypes_data = pd.read_csv(args.best_prototype_path)
+        # self.prototypes_data = pd.read_csv(args.best_prototype_path)
         self.searching_space = pd.read_csv(args.searching_space_path)
         self.predict_labels = predict_labels_df
 
@@ -177,19 +179,51 @@ class PostScreening():
         return has_cas
     
 
-    def filter_by_commercial(self, samples_df):
-        # filter by commercial availability
-        filtered_samples = []
-        for i, (idx, row) in zip(tqdm(range(len(samples_df))), samples_df.iterrows()):
+    def filter_by_commercial(self, samples_df, checkpoint_file='./outputs/filtered_commercial.csv'):
+        # 读取 checkpoint
+        if os.path.exists(checkpoint_file):
+            filtered_samples_df = pd.read_csv(checkpoint_file)
+            processed_smiles = set(filtered_samples_df['SMILES'].tolist())
+            print(f"Resuming from checkpoint, already processed: {len(processed_smiles)} samples")
+        else:
+            filtered_samples_df = pd.DataFrame(columns=samples_df.columns)
+            processed_smiles = set()
+
+        # 准备待处理数据
+        samples_to_check = [row for idx, row in samples_df.iterrows() if row['SMILES'] not in processed_smiles]
+
+        def check_commercial(row):
             smiles = row['SMILES']
-            commercial = self.is_commercial(smiles)
+            try:
+                return row if self.is_commercial(smiles) else None
+            except Exception as e:
+                print(f"Error checking {smiles}: {e}")
+                return None
 
-            if commercial:
-                filtered_samples.append(row)
-            else:
-                continue
+        new_rows = []
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            # 提交任务
+            future_to_row = {executor.submit(check_commercial, row): row for row in samples_to_check}
 
-        filtered_samples_df = pd.DataFrame(filtered_samples)
+            # tqdm 显示进度
+            for future in tqdm(as_completed(future_to_row), total=len(future_to_row)):
+                result = future.result()
+                if result is not None:
+                    new_rows.append(result)
+
+                # 每 batch_size 条保存一次
+                if len(new_rows) >= 100:
+                    temp_df = pd.DataFrame(new_rows)
+                    filtered_samples_df = pd.concat([filtered_samples_df, temp_df], ignore_index=True)
+                    filtered_samples_df.to_csv(checkpoint_file, index=False)
+                    new_rows = []
+
+        # 保存最后剩余的数据
+        if new_rows:
+            temp_df = pd.DataFrame(new_rows)
+            filtered_samples_df = pd.concat([filtered_samples_df, temp_df], ignore_index=True)
+            filtered_samples_df.to_csv(checkpoint_file, index=False)
+
         print(f'After filtering by commercial: {len(filtered_samples_df)}')
 
         return filtered_samples_df
