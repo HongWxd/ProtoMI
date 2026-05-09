@@ -40,7 +40,7 @@ class GCN(torch.nn.Module):
 
 
 class GINE(torch.nn.Module):
-    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
         super(GINE, self).__init__()
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))
@@ -108,7 +108,7 @@ class ProjectionHead_PCL(nn.Module):
         return self.mlp(x)
 
 class Cluster_GINE(torch.nn.Module):
-    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout, args):
+    def __init__(self, num_node_features, num_edge_features, hidden_channels, num_classes, dropout):
         super(Cluster_GINE, self).__init__()
 
         nn1 = Sequential(Linear(num_node_features, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels))

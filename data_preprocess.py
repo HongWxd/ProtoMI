@@ -1,5 +1,5 @@
 import pickle
-from utils.data_loader_CL import MoleculeDataset
+from utils.data_loader import MoleculeDataset
 import itertools
 from tqdm import tqdm
 import warnings

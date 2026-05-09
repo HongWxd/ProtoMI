@@ -1,66 +1,83 @@
 import torch
 import pandas as pd
+import numpy as np
+import json
+import pickle
+
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
-from utils.tools import Graph_data_generator, get_statistical_values, get_reproted_descriptor
+from utils.tools import Graph_data_generator, get_statistical_values, perturb_edges
 from sklearn.model_selection import train_test_split
-from rdkit import Chem
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from pymatgen.core import Composition
+from utils.graph_augmentation import Graph_Augmentation_Helper
+from sklearn.decomposition import PCA
 
 class MoleculeDataset(Dataset):
-    def __init__(self, labeled_path, unlabeled_path, searching_space_path, analysis=True, load_flag=True, 
-                 embedding_visual=False, is_baseline=False, load_descriptors=False):
-        self.labeled_data_df = pd.DataFrame(pd.read_csv(labeled_path))
-        self.unlabeled_data_df = pd.DataFrame(pd.read_csv(unlabeled_path))
+    def __init__(self, labeled_path, searching_space_path):
+        with open(labeled_path, 'r') as file:
+            additives_data = json.load(file)
+        
+        self.reported_smiles = [i['smiles'] for i in additives_data.values()]
+        self.reported_formulas = additives_data.keys()
         self.searching_space_df = pd.DataFrame(pd.read_csv(searching_space_path))
 
-        self.analysis = analysis
-        self.load_flag = load_flag
-        self.embedding_visual = embedding_visual
-        self.is_baseline = is_baseline
-        self.load_descriptor = load_descriptors
         self.cids = list(sorted(set(self.searching_space_df['cid'].values)))
         self.cids = [int(i) for i in self.cids]
-        
-        if self.load_descriptor:
-            self.norm_MD, self.norm_VO, self.norm_YSS, self.norm_normal, self.sorted_cids = self.load_descriptors()
-        
-        if self.is_baseline:
-            self.baseline_data = self.load_baseline_data()
-            # self.analysis = False
 
-        if self.load_flag:
-            self.data = self.load_data()
+        self.all_smiles = []
+        self.id = []
+        self.names = []
+        # load all molecules smiles
+        for smile, id, name in tqdm(zip(self.reported_smiles, list(range(len(self.reported_formulas))), self.reported_formulas), desc='Loading all reported molecules'):
+            self.all_smiles.append(smile)
+            self.id.append(int(id))
+            self.names.append(name)
 
-        if self.analysis:
-            if self.load_flag:
-                self.analysis_dataset(self.data)
+        additive_id_df = pd.DataFrame()
+        additive_id_df['id'] = self.id
+        additive_id_df['name'] = self.names
+        additive_id_df.to_csv('./V3/processed_data/additive_id_mapping.csv', index=False)
+        print('Generate additive-ID mapping file.')
+
+        for cid in tqdm(self.cids, desc='Loading all molecules from searching space'):
+            _, _, smile, _, _, _, _ = self.read_from_one_call(cid)
+            self.all_smiles.append(smile)
+            self.id.append(int(cid))
+
+        self.data = self.load_data()
+        
+        self.analysis_dataset(self.data)
 
     def load_data(self):
-        labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
-
-        # for normalization purpose
+        # for hard code normalization purpose
         mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std = self.get_mean_std_values()
 
         data_list = []
-        for cid in tqdm(self.sorted_cids, desc='Converting smiles data to graph data'):
+        # add all molecules data
+        for smile, id in zip(tqdm(self.all_smiles, desc='Converting all smiles data to graph data'), self.id):
             # get the graph data for each compound
-            _, formula, smile, _, _, _, _, label = self.read_from_one_call(cid)
-            x, edge_index, edge_attr, label, n_nodes, n_edges, n_node_features, n_edge_features = Graph_data_generator(smile, formula, label, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
+            x, edge_index, edge_attr, n_nodes, n_edges, _, _ = Graph_data_generator(smile, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std) # edge_attr: (n_edges, n_edge_features)
             if x == None:
-                continue # if RDKit package can not convert smile into mol, we will drop this compound
+                continue # if RDKit package can not convert smile into mol, we will drop this molecule
 
-            # get the mask for semi-supervised learning
-            if cid in labeled_cid_list:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=True, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
-            else:
-                graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, y = label, mask=False, cid=cid, n_nodes = n_nodes, n_edges = n_edges, n_node_features = n_node_features, n_edge_features = n_edge_features)
-            
+            graph_data = Data(x = x, edge_index = edge_index, edge_attr = edge_attr, id = id, n_nodes = n_nodes, n_edges = n_edges)
             data_list.append(graph_data)
+        
+        # normalization for edge features
+        all_edge_attrs = [data.edge_attr for data in data_list if data.edge_attr is not None]
+        all_edge_attrs = torch.cat(all_edge_attrs, dim=0)
 
+        edge_mean = all_edge_attrs.mean(dim=0, keepdim=True)
+        edge_std = all_edge_attrs.std(dim=0, keepdim=True) + 1e-6
+
+        for data in data_list:
+            if data.edge_attr is not None:
+                data.edge_attr = (data.edge_attr - edge_mean) / edge_std
+
+        # # filter the redundent features
+        # data_list = self.features_reduction(data_list, 'node')
+        # data_list = self.features_reduction(data_list, 'edge')
+        
         return data_list        
 
     def read_from_one_call(self, idx):
@@ -70,26 +87,43 @@ class MoleculeDataset(Dataset):
         topological = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'topological'].values[0])
         weight = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'weight'].values[0])
         heavy_atom = str(self.searching_space_df.loc[self.searching_space_df['cid'] == float(idx), 'heavy_atom'].values[0])
-        labeled_cid_list = self.labeled_data_df['cid'].values.tolist()
-        if idx in labeled_cid_list:
-            label = self.labeled_data_df.loc[self.labeled_data_df['cid'] == idx, 'label'].values[0]
-        else:
-            label = 2# stands for unlabeled data
-        return idx, formula, smile, fingerprint, topological, weight, heavy_atom, label
+        return idx, formula, smile, fingerprint, topological, weight, heavy_atom
     
-    def data_split(self, data_list):
-        train_data, test_data = train_test_split(data_list, test_size=0.2, random_state=42)
-        train_data, val_data = train_test_split(train_data, test_size=0.2, random_state=42)
+    def features_reduction(self, data_list, features_type):
+        all_features = []
+        for data in data_list:
+            if hasattr(data, 'x') and data.x is not None:
+                if features_type == 'node':
+                    all_features.append(data.x.numpy())
+                elif features_type == 'edge':
+                    all_features.append(data.edge_attr.numpy())
 
-        return train_data, val_data, test_data
-    
+        X = np.vstack(all_features)
+
+        pca = PCA(n_components=min(10, X.shape[1]))  
+        pca.fit(X)
+
+        loadings = pca.components_  # shape = [n_components, n_features]
+        n_components = loadings.shape[0]
+
+        top_k = min(10, n_components)
+        loadings_subset = loadings[:top_k, :]
+        low_contrib_mask = np.all(np.abs(loadings_subset) < 0.01, axis=0)
+        filtered_indices = np.where(~low_contrib_mask)[0]
+
+        for data in data_list:
+            if hasattr(data, 'x') and data.x is not None:
+                data.x = data.x[:, filtered_indices]
+
+        return data_list
+
     def analysis_dataset(self, data_list):
         nodes, edges, nodes_feature, edges_feature = 0, 0, 0, 0
         for value in data_list:
             nodes += value.n_nodes
             edges += value.n_edges
-            nodes_feature += value.n_node_features
-            edges_feature += value.n_edge_features
+            nodes_feature += value.x.shape[1]
+            edges_feature += value.edge_attr.shape[1]
         
         print('---------Here is the basic info of loaded dataset---------')
         print('avg nodes:', nodes / self.__len__())
@@ -98,15 +132,13 @@ class MoleculeDataset(Dataset):
         print('edges feature:', edges_feature / self.__len__())
         print('number of degrees:', 2 * edges / self.__len__())
         print('avg degree:', 2 * edges / nodes)
-        print('label rate:', len(self.save_labeled_data()) / self.__len__())
     
     def get_mean_std_values(self):
         total_all_masses = []
         total_all_vdw = []
         total_all_covalent = []
-        for cid in tqdm(self.sorted_cids, desc='Get some statistical values of data'):
-            _, formula, smile, _, _, _, _,_ = self.read_from_one_call(cid)
-            mol, all_masses, all_vdw, all_covalent = get_statistical_values(smile)
+        for smile in tqdm(self.all_smiles, desc='Get some statistical values of data'):
+            _, all_masses, all_vdw, all_covalent = get_statistical_values(smile)
             if all_masses == None:
                 continue
 
@@ -119,68 +151,6 @@ class MoleculeDataset(Dataset):
         covalent_mean, covalent_std = np.mean(total_all_covalent), np.std(total_all_covalent)
 
         return mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std
-    
-    def load_descriptors(self):
-        total_descriptors = []
-        total_MD = []
-        total_VO = []
-        total_YSS = []
-        sorted_cids = []
-        for i, cid in enumerate(tqdm(self.cids, desc='Load all descriptors')):
-            _, formula, smile, _, _, _, _,_ = self.read_from_one_call(cid)
-            mol = Chem.MolFromSmiles(smile)
-            if mol == None:
-                continue
-
-            Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor = get_reproted_descriptor(formula, mol)
-            if Normal_descriptors == None:
-                continue
-            elif np.isnan(Normal_descriptors).any():
-                continue
-
-            total_descriptors.append(Normal_descriptors)
-            total_MD.append(MD_descriptor)
-            total_VO.append(VO_descriptor)
-            total_YSS.append(YSS_descriptor)
-            sorted_cids.append(cid)
-        
-        total_descriptors = np.array(total_descriptors)
-        total_descriptors = np.nan_to_num(total_descriptors, nan=0.0)
-        total_MD = np.array(total_MD)
-        total_VO = np.array(total_VO)
-        total_YSS = np.array(total_YSS)
-        scaler_MD = MinMaxScaler()
-        scaler_VO = MinMaxScaler()
-        scaler_YSS = MinMaxScaler()
-        scaler_normal = MinMaxScaler()
-
-        norm_MD = scaler_MD.fit_transform(total_MD)
-        norm_VO = scaler_VO.fit_transform(total_VO)
-        norm_YSS = scaler_YSS.fit_transform(total_YSS)
-        norm_normal = scaler_normal.fit_transform(total_descriptors)
-
-        return norm_MD, norm_VO, norm_YSS, norm_normal, sorted_cids
-    
-    def save_labeled_data(self):
-        labeled_data_list = []
-        for data in self.data:
-            if data.y != 2:
-                labeled_data_list.append(data)
-        
-        return labeled_data_list
-    
-    # smiles data
-    def load_baseline_data(self):
-        baseline_data = []
-        for cid in tqdm(self.sorted_cids):
-            _, _, smile, _, _, _, _, label = self.read_from_one_call(cid)
-            smile = str(smile)
-            label = int(label)
-            if label != 2:
-                data = Data(smile = smile, y = label)
-                baseline_data.append(data)
-        
-        return baseline_data
 
     def __len__(self):
         return len(self.data)
@@ -188,3 +158,16 @@ class MoleculeDataset(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
+
+def load_data(args):
+    # data preparation
+    with open(args.data_path, 'rb') as f:
+        all_data = pickle.load(f)
+
+    positive_samples = all_data[:126] # number of positive samples
+    unlabeled_samples = all_data[126:]
+
+    graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
+    pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()
+    unl_train_samples, unl_test_samples = train_test_split(unlabeled_samples, test_size=args.test_size, random_state=args.random_state)
+    return positive_samples, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples

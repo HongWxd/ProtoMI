@@ -2,22 +2,18 @@ import numpy as np
 import random
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import Descriptors
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from sklearn.metrics import normalized_mutual_info_score
-from torch_geometric.loader import DataLoader
-from torch_geometric.data import Data
 from sklearn.utils.class_weight import compute_class_weight
 import matminer.featurizers.composition as mm_composition
-import matminer.featurizers.structure as mm_structure
 from pymatgen.core import Composition
-from torch_geometric.utils import subgraph
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from sklearn.metrics import silhouette_score
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
@@ -122,46 +118,8 @@ def get_bond_features(bond,
 
     return np.array(bond_feature_vector)
 
-def get_reproted_descriptor(formula, mol):
-    try:
-        comp = Composition(formula)
-    except:
-        return None, None, None, None
-    md_featurizer = mm_composition.Meredig()
-    MD_descriptor = md_featurizer.featurize(comp)
 
-    # os_featurizer = mm_composition.OxidationStates()
-    # OS_descriptor = os_featurizer.featurize(comp)
 
-    # sc_featurizer = mm_structure.StructuralComplexity()
-
-    vo_featurizer = mm_composition.ValenceOrbital()
-    VO_descriptor = vo_featurizer.featurize(comp)
-
-    yss_featurizer = mm_composition.YangSolidSolution()
-    YSS_descriptor = yss_featurizer.featurize(comp)
-
-    Normal_descriptors = getMolDescriptors(mol)
-
-    return Normal_descriptors, MD_descriptor, VO_descriptor, YSS_descriptor
-
-def getMolDescriptors(mol, missingVal=None):
-    ''' calculate the full list of descriptors for a molecule
-        missingVal is used if the descriptor cannot be calculated
-    '''
-    res = []
-    for nm,fn in Descriptors._descList:
-        # some of the descriptor fucntions can throw errors if they fail, catch those here:
-        try:
-            val = fn(mol)
-        except:
-            # print the error message:
-            import traceback
-            traceback.print_exc()
-            # and set the descriptor value to whatever missingVal is
-            val = missingVal
-        res.append(val)
-    return res
 
 def Graph_data_generator(x_smiles, mass_mean, mass_std, vdw_mean, vdw_std, vdw_max, covalent_mean, covalent_std):
     # convert SMILES to RDKit mol object   
@@ -230,82 +188,6 @@ def get_statistical_values(x_smiles):
     return mol, all_masses, all_vdw, all_covalent
 
 
-def training_data_analysis(fold, train_data, test_data):
-    train_label_set = [i for i in train_data if i.mask == True]
-    train_1 = len([i for i in train_label_set if i.y == 1])
-    train_0 = len([i for i in train_label_set if i.y == 0])
-
-    test_label_set = [i for i in test_data if i.mask == True]
-    test_1 = len([i for i in test_label_set if i.y == 1])
-    test_0 = len([i for i in test_label_set if i.y == 0])
-
-    print(f'Fold {fold} | train 1: {(train_1) / (train_1 + train_0):.4f} | train 0: {train_0 / (train_1 + train_0):.4f} | test 1: {test_1 / (test_1 + test_0):.4f} | test 0: {test_0 / (test_1 + test_0):.4f} ')
-
-def greedy_select_facilities(embeddings, k):
-    # Greedy Max-Min selection of k medoids
-    selected = []
-    remaining = list(range(len(embeddings)))
-    selected.append(torch.randint(0, len(embeddings), (1,)).item())
-
-    for _ in range(1, k):
-        dists = torch.stack([
-            torch.norm(embeddings[i] - embeddings[selected], dim=1).min()
-            for i in remaining
-        ])
-        next_idx = remaining[dists.argmax().item()]
-        selected.append(next_idx)
-        remaining.remove(next_idx)
-
-    return embeddings[selected]
-
-def facility_location_loss(embeddings, labels, gamma=1.0):
-    # embeddings: [B, D], labels: [B]
-    device = embeddings.device
-    unique_labels = labels.unique()
-
-    # Ground truth score
-    gt_loss = 0.0
-    for lbl in unique_labels:
-        cluster = embeddings[labels == lbl]
-        if cluster.shape[0] <= 1:
-            continue
-        dists = torch.cdist(cluster, cluster)
-        medoid_idx = dists.sum(dim=1).argmin()
-        medoid = cluster[medoid_idx]
-        gt_loss += torch.norm(cluster - medoid, dim=1).sum()
-    gt_loss = -gt_loss
-
-    # Approximate worst clustering (greedy)
-    S = greedy_select_facilities(embeddings, k=len(unique_labels))
-    dist_mat = torch.cdist(embeddings, S)
-    min_dist = dist_mat.min(dim=1)[0]
-    F_S = -min_dist.sum()
-
-    # NMI term
-    pred_labels = dist_mat.argmin(dim=1).detach().cpu().numpy()
-    true_labels = labels.detach().cpu().numpy()
-    delta = 1.0 - normalized_mutual_info_score(true_labels, pred_labels)
-
-    loss = torch.clamp(F_S + gamma * delta - gt_loss, min=0.0)
-    return loss
-
-def imbalanced_weights(train_data, train_loader, epoch, device):
-    total_masked = 0
-    label_0 = 0
-    label_1 = 0
-    for data in train_loader:
-        total_masked += int(data.mask.sum())
-        label_0 += (data.y == 0).sum().item()
-        label_1 += (data.y == 1).sum().item()
-    print(f"[Epoch {epoch}] Train set labeled (mask=True): {total_masked} | label 0: {label_0 / total_masked:.4f} | label 1: {label_1 / total_masked:.4f}")
-
-    y = []
-    for data in train_data:
-        y.append(data.y.item())
-    weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
-    weights = torch.tensor(weights, dtype=torch.float32).to(device)
-
-    return total_masked, weights
 
 def plot_PCL_Trials_SC(total_sc_scores, trials):
     plt.figure(figsize=(12, 5))
@@ -390,21 +272,27 @@ def try_multiple_cluster_combinations(Z, all_embeddings, pos_additives_names, ar
         # filter the outliers in each cluster
         filtered_embeddings, filtered_labels, filtered_indices = filter_cluster_outliers(all_embeddings, cluster_labels)
 
-        try:
-            Z_filt = linkage(filtered_embeddings, method='average', metric='cosine')
-            score = silhouette_score(filtered_embeddings, filtered_labels, metric='cosine')
-            if score > best_score:
-                best_score = score
-                best_k = k
-                best_labels = filtered_labels
-                best_embeddings = filtered_embeddings
-                if args.retrain_usl:
-                    best_names = None
-                else:
-                    best_names = np.array(pos_additives_names)[filtered_indices].tolist()
-                best_Z = Z_filt
-        except Exception as e:
-            print(f"k={k} failed: {e}")
+        Z_filt = linkage(filtered_embeddings, method='average', metric='cosine')
+        score = silhouette_score(filtered_embeddings, filtered_labels, metric='cosine')
+        if score > best_score:
+            best_score = score
+            best_k = k
+            best_labels = filtered_labels
+            best_embeddings = filtered_embeddings
+            filtered_indices = [
+                int(i.detach().cpu().item()) if torch.is_tensor(i) else int(i)
+                for i in filtered_indices
+            ]
+
+            best_names = [
+                pos_additives_names[i].detach().cpu().item()
+                if torch.is_tensor(pos_additives_names[i])
+                else pos_additives_names[i]
+                for i in filtered_indices
+            ]
+            # best_names = np.array(pos_additives_names)[filtered_indices].tolist()
+            best_Z = Z_filt
+
 
     print(f"\n✅ best cluster number: {best_k}, average silhouette score: {best_score:.4f}")
 
@@ -425,7 +313,9 @@ def filter_cluster_outliers(embeddings, cluster_labels, alpha=1.5):
             continue
 
         centroid = np.mean(cluster_emb, axis=0)
-        distances = np.linalg.norm(cluster_emb - centroid, axis=1)
+        centroid = centroid.reshape(1, -1)
+        cos_sim = cosine_similarity(cluster_emb, centroid)
+        distances = 1 - cos_sim.squeeze()
 
         # threshold = mean + α * std
         d_mean = distances.mean()
@@ -442,3 +332,24 @@ def filter_cluster_outliers(embeddings, cluster_labels, alpha=1.5):
     filtered_labels = np.concatenate(filtered_labels)
     filtered_indices = np.concatenate(filtered_indices)
     return filtered_embeddings, filtered_labels, filtered_indices
+
+
+
+def collect_mol_info_by_ids(ids, searching_space_df):
+    cids = []
+    smiles_list = []
+    for cid in ids:
+        cids.append(cid)
+        smiles = searching_space_df.loc[searching_space_df['cid'] == cid, 'SMILES'].values
+        if len(smiles) > 0:
+            smiles_list.append(smiles[0])
+        else:
+            smiles_list.append(None)
+    
+    mol_info_after_post_screen_df = pd.DataFrame({'cid': cids, 'smiles': smiles_list})
+        
+    return mol_info_after_post_screen_df
+
+
+def mol_to_fp(mol, radius=2, nBits=2048):
+    return AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nBits)

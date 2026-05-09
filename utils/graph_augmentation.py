@@ -217,7 +217,7 @@ class Graph_Augmentation_Helper():
             num_drop = int(len(edge_list) * drop_ratio)
             if num_drop > 0:
                 weights = torch.tensor(edge_scores)
-                weights = (weights.max() - weights + 1e-8)  # 分数越小越容易被删
+                weights = (weights.max() - weights + 1e-8)  
                 weights = weights / weights.sum()
                 drop_idx = torch.multinomial(weights, num_drop, replacement=False)
                 keep_edges = [edge_list[i] for i in range(len(edge_list)) if i not in drop_idx]
