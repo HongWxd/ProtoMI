@@ -56,7 +56,10 @@ class Recommender():
         USL_encoder.load_state_dict(torch.load(f'{self.file_path}')) # load the checkpoints
         USL_projection = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
 
-        print(f'All Models are loaded!')
+        print(f'Encoder is loaded from {self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
+        print(f'Projection is loaded from {self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
+        print(f'Prototype centroid is loaded from {self.save_path}/proto_centroids_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
+
 
         return PCL_encoder, PCL_projection, USL_encoder, USL_projection, proto_centroids
     

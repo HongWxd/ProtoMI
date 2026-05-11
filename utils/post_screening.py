@@ -1,11 +1,18 @@
 import os
 import requests
 import time
+import random
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import json
 
+import time
+import random
+import requests
+import pandas as pd
+from tqdm import tqdm
+from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -165,69 +172,181 @@ class PostScreening():
     
     
     def is_commercial(self, smiles):
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{smiles}/synonyms/JSON"
-        res = requests.get(url)
+        """
+        查询 PubChem synonyms，判断是否具有 CAS 号。
 
-        if res.status_code != 200:
-            return False
+        返回：
+            has_cas: bool
+            status_code: int
+        """
 
-        data = res.json()
-        synos = data["InformationList"]["Information"][0].get("Synonym", [])
+        smiles_encoded = quote(str(smiles), safe="")
 
-        has_cas = any("-" in s and s.replace("-", "").isdigit() for s in synos)
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{smiles_encoded}/synonyms/JSON"
 
-        return has_cas
-    
+        try:
+            time.sleep(random.uniform(0.5, 1.5))
 
-    def filter_by_commercial(self, samples_df, checkpoint_file='./outputs/filtered_commercial.csv'):
-        # 读取 checkpoint
-        if os.path.exists(checkpoint_file):
-            filtered_samples_df = pd.read_csv(checkpoint_file)
-            processed_smiles = set(filtered_samples_df['SMILES'].tolist())
-            print(f"Resuming from checkpoint, already processed: {len(processed_smiles)} samples")
+            res = requests.get(url, timeout=20)
+
+            status_code = res.status_code
+            print(f"status code: {status_code}")
+
+            if status_code != 200:
+                return False, status_code
+
+            data = res.json()
+
+            synos = data["InformationList"]["Information"][0].get("Synonym", [])
+
+            has_cas = any(
+                "-" in s and s.replace("-", "").isdigit()
+                for s in synos
+            )
+
+            return has_cas, 200
+
+        except Exception as e:
+            print(f"Error in is_commercial for SMILES {smiles}: {e}")
+            return False, -1
+
+
+    def filter_by_commercial(self, samples_df, max_workers=2):
+        """
+        多线程检查分子是否具有 CAS 号。
+
+        第一轮：
+            - 200：正常判断是否有 CAS
+            - 503：暂存，后续重试
+            - 其他状态码：暂时认为未通过
+
+        第二轮：
+            - 只重新检查第一轮返回 503 的分子
+
+        返回：
+            filtered_samples_df: 具有 CAS 号的完整分子信息
+        """
+
+        def check_one(row):
+            smiles = row["SMILES"]
+
+            try:
+                has_cas, status_code = self.is_commercial(smiles)
+
+                if has_cas:
+                    return {
+                        "status": "has_cas",
+                        "row": row,
+                        "status_code": status_code
+                    }
+
+                elif status_code == 503:
+                    return {
+                        "status": "retry_503",
+                        "row": row,
+                        "status_code": status_code
+                    }
+
+                else:
+                    return {
+                        "status": "no_cas",
+                        "row": row,
+                        "status_code": status_code
+                    }
+
+            except Exception as e:
+                print(f"Error checking SMILES {smiles}: {e}")
+                return {
+                    "status": "error",
+                    "row": row,
+                    "status_code": -1
+                }
+
+        def run_round(rows, round_name="first round", workers=8):
+            passed_rows = []
+            retry_503_rows = []
+
+            print(f"\nStart {round_name}, total molecules: {len(rows)}")
+
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = [
+                    executor.submit(check_one, row)
+                    for row in rows
+                ]
+
+                for future in tqdm(as_completed(futures), total=len(futures)):
+                    result = future.result()
+
+                    if result["status"] == "has_cas":
+                        passed_rows.append(result["row"])
+
+                        if "cid" in result["row"]:
+                            print(f"Found CAS, CID: {result['row']['cid']}")
+                        else:
+                            print("Found CAS")
+
+                    elif result["status"] == "retry_503":
+                        retry_503_rows.append(result["row"])
+
+            print(f"{round_name} found CAS: {len(passed_rows)}")
+            print(f"{round_name} 503 number: {len(retry_503_rows)}")
+
+            return passed_rows, retry_503_rows
+
+        # 第一轮
+        samples_to_check = [
+            row.copy()
+            for _, row in samples_df.iterrows()
+        ]
+
+        first_passed_rows, retry_503_rows = run_round(
+            samples_to_check,
+            round_name="first round",
+            workers=max_workers
+        )
+
+        all_passed_rows = []
+        all_passed_rows.extend(first_passed_rows)
+
+        # 第二轮：只重新检查 503 的分子
+        if len(retry_503_rows) > 0:
+            print("\nWaiting 60 seconds before retrying 503 molecules...")
+            time.sleep(60)
+
+            second_passed_rows, still_503_rows = run_round(
+                retry_503_rows,
+                round_name="second round for 503",
+                workers=max(1, min(3, max_workers))
+            )
+
+            all_passed_rows.extend(second_passed_rows)
+
+            if len(still_503_rows) > 0:
+                still_503_df = pd.DataFrame(still_503_rows)
+                still_503_df.to_csv(
+                    "./outputs/pubchem_503_still_failed.csv",
+                    index=False
+                )
+                print(f"Still 503 after second round: {len(still_503_df)}")
+                print("Saved still-503 molecules to ./outputs/pubchem_503_still_failed.csv")
+
+        # 去重，避免第一轮和第二轮重复
+        if len(all_passed_rows) > 0:
+            filtered_samples_df = pd.DataFrame(all_passed_rows)
+
+            if "cid" in filtered_samples_df.columns:
+                filtered_samples_df = filtered_samples_df.drop_duplicates(subset=["cid"])
+            elif "SMILES" in filtered_samples_df.columns:
+                filtered_samples_df = filtered_samples_df.drop_duplicates(subset=["SMILES"])
+            else:
+                filtered_samples_df = filtered_samples_df.drop_duplicates()
+
         else:
             filtered_samples_df = pd.DataFrame(columns=samples_df.columns)
-            processed_smiles = set()
 
-        # 准备待处理数据
-        samples_to_check = [row for idx, row in samples_df.iterrows() if row['SMILES'] not in processed_smiles]
-
-        def check_commercial(row):
-            smiles = row['SMILES']
-            try:
-                return row if self.is_commercial(smiles) else None
-            except Exception as e:
-                print(f"Error checking {smiles}: {e}")
-                return None
-
-        new_rows = []
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            # 提交任务
-            future_to_row = {executor.submit(check_commercial, row): row for row in samples_to_check}
-
-            # tqdm 显示进度
-            for future in tqdm(as_completed(future_to_row), total=len(future_to_row)):
-                result = future.result()
-                if result is not None:
-                    new_rows.append(result)
-
-                # 每 batch_size 条保存一次
-                if len(new_rows) >= 100:
-                    temp_df = pd.DataFrame(new_rows)
-                    filtered_samples_df = pd.concat([filtered_samples_df, temp_df], ignore_index=True)
-                    filtered_samples_df.to_csv(checkpoint_file, index=False)
-                    new_rows = []
-
-        # 保存最后剩余的数据
-        if new_rows:
-            temp_df = pd.DataFrame(new_rows)
-            filtered_samples_df = pd.concat([filtered_samples_df, temp_df], ignore_index=True)
-            filtered_samples_df.to_csv(checkpoint_file, index=False)
-
-        print(f'After filtering by commercial: {len(filtered_samples_df)}')
+        print(f"\nAfter filtering by commercial: {len(filtered_samples_df)}")
 
         return filtered_samples_df
-
 
     def filter(self, emb_unl, unl_ids):
         predict_samples_data = self.load_all_samples()
@@ -237,7 +356,10 @@ class PostScreening():
         filtered_samples_df = self.filter_by_molecular_weight(filtered_samples_df, min_pos_mw, max_pos_mw)
         filtered_samples_df = self.filter_by_SAScore(filtered_samples_df)
         filtered_samples_df = self.filter_by_labile_H(filtered_samples_df)
-        filtered_samples_df = self.filter_by_commercial(filtered_samples_df)
+
+        # filtered_samples_df.to_csv(f'./outputs/filter_list_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.csv', index=False)
+
+        # filtered_samples_df = self.filter_by_commercial(filtered_samples_df)
 
         remain_ids = set(filtered_samples_df['cid'].tolist())
 

@@ -8,3 +8,5 @@
 /plot_scripts/pearson_data
 /papers
 /legacy
+/ablation
+/ablation_checkpoints

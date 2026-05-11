@@ -39,6 +39,7 @@ parser.add_argument('--save_path', type=str, default='checkpoints_origin_backup'
 parser.add_argument('--device', type=str, default='cuda:7' if torch.cuda.is_available() else 'cpu', help='Device to use for training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data_V2.csv', help='Path to the CSV file containing the searching space data')
 parser.add_argument('--additive_json_path', type=str, default='./V3/processed_data/additives.json', help='Path to the JSON file containing additive data')
+parser.add_argument('--no_need_train', type=str2bool, default=False, help='')
 
 
 
@@ -146,58 +147,72 @@ if __name__ == '__main__':
         os.makedirs(f"./{args.save_path}")
 
 
-    print(args.EMA, args.device)
+    if args.no_need_train is False:
+        ### recommendation method selection and model training
+        if args.method == 'random':
+            print("Loading data...")
+            _, unlabeled_samples, _, _, _, _ = load_data(args)
+
+            print('Random recommendation is selected. No model will be trained.')
+            unl_loader = random_recommendation(unlabeled_samples, args.random_state)
+            pos_loader = None
+
+        elif args.method == 'morgan':
+            print("Loading data...")
+            positive_samples, unlabeled_samples, unl_samples_graph = load_data(args)
+
+            print('Morgan fingerprint-based recommendation is selected. No model will be trained.')
+            unl_loader = morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph)
+            pos_loader = None
+
+        elif args.method == 'full_model':
+            ### load data
+            print("Loading data...")
+            positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
+            print('Model-based recommendation is selected. Start training the models and doing recommendation.')
+            print("Getting the representation model...")
+
+            all_pos_samples = pos_train_samples + pos_test_samples
+            pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+            unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+            print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
+
+            # training the unsupervised learning model (USL)
+            usl = USL(args)
+            usl_encoder = usl.get_representation_model(pos_train_samples, pos_test_samples)
 
 
-    ### recommendation method selection and model training
-    if args.method == 'random':
-        print("Loading data...")
-        _, unlabeled_samples, _, _, _, _ = load_data(args)
+            # training the prototype contrastive learning model (PCL)
+            proto_train_samples = pos_train_samples + unl_train_samples
+            proto_test_samples = pos_test_samples + unl_test_samples
+            pcl = PCL(args, all_pos_samples)
+            total_best_encoders, total_best_projections, total_best_embeddings, total_best_labels, total_best_proto_centroids = pcl.pcl_training(usl_encoder, proto_train_samples, proto_test_samples)
 
-        print('Random recommendation is selected. No model will be trained.')
-        unl_loader = random_recommendation(unlabeled_samples, args.random_state)
-        pos_loader = None
-
-    elif args.method == 'morgan':
-        print("Loading data...")
-        positive_samples, unlabeled_samples, unl_samples_graph = load_data(args)
-
-        print('Morgan fingerprint-based recommendation is selected. No model will be trained.')
-        unl_loader = morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph)
-        pos_loader = None
-
-    elif args.method == 'full_model':
-        ### load data
-        print("Loading data...")
-        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
-
-        print('Model-based recommendation is selected. Start training the models and doing recommendation.')
-        print("Getting the representation model...")
-
-        all_pos_samples = pos_train_samples + pos_test_samples
-        pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-        unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-        print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
-
-        # training the unsupervised learning model (USL)
-        usl = USL(args)
-        usl_encoder = usl.get_representation_model(pos_train_samples, pos_test_samples)
+            torch.save(total_best_encoders.state_dict(), f'{args.save_path}/PCL_encoder_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
+            torch.save(total_best_projections.state_dict(), f'{args.save_path}/PCL_projection_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
+            torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
 
 
-        # training the prototype contrastive learning model (PCL)
-        proto_train_samples = pos_train_samples + unl_train_samples
-        proto_test_samples = pos_test_samples + unl_test_samples
-        pcl = PCL(args, all_pos_samples)
-        total_best_encoders, total_best_projections, total_best_embeddings, total_best_labels, total_best_proto_centroids = pcl.pcl_training(usl_encoder, proto_train_samples, proto_test_samples)
-
-        torch.save(total_best_encoders.state_dict(), f'{args.save_path}/PCL_encoder_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-        torch.save(total_best_projections.state_dict(), f'{args.save_path}/PCL_projection_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-        torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-
-
+        else:
+            raise Exception('Invalid recommendation method. Please choose either "random" or "full_model".')
     else:
-        raise Exception('Invalid recommendation method. Please choose either "random" or "full_model".')
-    
+        print('\nDirectly do the recommendation and post-screening')    
+
+
+        if args.method == 'full_model':
+            ### load data
+            print("Loading data...")
+            positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
+            print('Model-based recommendation is selected. Start training the models and doing recommendation.')
+            print("Getting the representation model...")
+
+            all_pos_samples = pos_train_samples + pos_test_samples
+            pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+            unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+            print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
+           
 
 
 
