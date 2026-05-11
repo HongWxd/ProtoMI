@@ -1,11 +1,11 @@
 #!/bin/bash
 
-save_path=./ablation_checkpoints
+save_path=./ablation_checkpoints_2
 data_path=./data/all_data.pkl
 additive_json_path=./data/additives.json
 searching_space_path=./data/searching_space_data_V2.csv
 
-method=morgan
+method=full_model
 recommend_model=full_model
 seed=42
 usl_trials=10 # 10
@@ -15,7 +15,7 @@ proto_epoch=300 # 300
 EMA=True
 use_decor_loss=True
 use_topk=True
-device=cuda:3
+device=cuda:6
 
 
 echo "======================================"

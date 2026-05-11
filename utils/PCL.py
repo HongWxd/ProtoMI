@@ -17,7 +17,7 @@ from utils.visualization import plot_cluster_distribution_UMAP
 class PCL():
     def __init__(self, args, all_pos_samples):
         self.args = args
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = args.device
         self.pcl_hidden_channels = args.pcl_hidden_channels
         self.usl_hidden_channels = args.usl_hidden_channels
         self.dropout = args.dropout
@@ -39,20 +39,13 @@ class PCL():
         self.use_topk = args.use_topk
 
 
-        self.pcl_encoder = GINE(num_node_features=all_pos_samples[0].x.shape[1], num_edge_features=all_pos_samples[0].edge_attr.shape[1], 
-                hidden_channels=self.pcl_hidden_channels,
-                num_classes=self.num_classes, dropout=self.dropout).to(self.device)
-        self.pcl_projection = ProjectionHead_PCL(in_dim=self.pcl_hidden_channels).to(self.device)
-        self.usl_projection = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
-
-
     def get_prototypes(self, usl_encoder, pos_samples, trial, args):
         # get the original cluster in the positive samples
-        self.usl_projection = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
+        usl_projection = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
         pos_sample_loader = DataLoader(pos_samples, batch_size=self.usl_batch_size, shuffle=False)
         usl_encoder = usl_encoder.to(self.device)
         usl_encoder.eval()
-        self.usl_projection.eval()
+        usl_projection.eval()
         pos_graph_embeddings = []
         pos_additives_names = []
 
@@ -61,7 +54,7 @@ class PCL():
                 pos_additives_names += data.id
                 data = data.to(self.device)  
                 out = usl_encoder(data.x, data.edge_index, data.edge_attr, data.batch)
-                emb = self.usl_projection(out)
+                emb = usl_projection(out)
                 pos_graph_embeddings.append(emb.cpu())
                 
 
@@ -170,7 +163,7 @@ class PCL():
             if self.use_decor_loss:
                 decor_loss = ((proto_sim - torch.eye(num_prototypes, device=proto_sim.device)) ** 2).mean()
             else:
-                decor_loss = torch.tensor(0.0)
+                decor_loss = torch.tensor(0.0, device=self.device)
 
             loss = proto_loss + decor_loss
 
@@ -224,12 +217,12 @@ class PCL():
 
         all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
         all_labels = torch.cat(all_labels, dim=0).numpy()
-        sc_score = silhouette_score(all_embeddings, all_labels, metric='cosine')
 
         if len(np.unique(all_labels)) < 2:
             print("Not enough clusters for silhouette score calculation.")
             return -1
-
+        
+        sc_score = silhouette_score(all_embeddings, all_labels, metric='cosine')
         print(f"Silhouette Coefficient - Cosine: {sc_score:.6f}")
 
         return all_embeddings, all_labels, sc_score
@@ -256,8 +249,13 @@ class PCL():
             molecule_id = torch.tensor(molecule_id, dtype=torch.int)
             proto_label = torch.tensor(proto_label, dtype=torch.int)
 
+            pcl_encoder = GINE(num_node_features=self.all_pos_samples[0].x.shape[1], num_edge_features=self.all_pos_samples[0].edge_attr.shape[1], 
+                hidden_channels=self.pcl_hidden_channels,
+                num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+            pcl_projection = ProjectionHead_PCL(in_dim=self.pcl_hidden_channels).to(self.device)
 
-            optimizer = torch.optim.Adam(list(self.pcl_encoder.parameters()) + list(self.pcl_projection.parameters()), lr=self.pcl_learning_rate, weight_decay=5e-4)
+
+            optimizer = torch.optim.Adam(list(pcl_encoder.parameters()) + list(pcl_projection.parameters()), lr=self.pcl_learning_rate, weight_decay=5e-4)
 
             
             proto_train_loss = []
@@ -269,7 +267,7 @@ class PCL():
             best_sc_cosine = -1
             for epoch in tqdm(range(1, self.proto_epoch + 1), desc='Training the prototype contrastive learning model...'):
                 # get the prototypes embeddings
-                new_proto_centroids = self.update_proto_centroids(molecule_id, proto_label, self.pcl_encoder, self.pcl_projection)
+                new_proto_centroids = self.update_proto_centroids(molecule_id, proto_label, pcl_encoder, pcl_projection)
                 if epoch == 1:
                     proto_centroids = new_proto_centroids
                 else:
@@ -283,16 +281,16 @@ class PCL():
                 #     print(f'Prototypes for trial {trial} epoch {epoch} are saved.')
 
                 # training
-                self.pcl_encoder, self.pcl_projection, avg_epoch_train_loss = self.prototype_contrastive_training(epoch, self.pcl_encoder, self.pcl_projection, optimizer, proto_train_loader, proto_centroids)
+                pcl_encoder, pcl_projection, avg_epoch_train_loss = self.prototype_contrastive_training(epoch, pcl_encoder, pcl_projection, optimizer, proto_train_loader, proto_centroids)
                 proto_train_loss.append(avg_epoch_train_loss)
 
                 # evaluating
-                all_embeddings, all_labels, sc_cosine = self.prototype_contrastive_eval(self.pcl_encoder, self.pcl_projection, proto_test_loader, proto_centroids)
+                all_embeddings, all_labels, sc_cosine = self.prototype_contrastive_eval(pcl_encoder, pcl_projection, proto_test_loader, proto_centroids)
 
                 if sc_cosine > best_sc_cosine:
                     best_sc_cosine = sc_cosine
-                    best_encoder = copy.deepcopy(self.pcl_encoder)
-                    best_projection = copy.deepcopy(self.pcl_projection)
+                    best_encoder = copy.deepcopy(pcl_encoder)
+                    best_projection = copy.deepcopy(pcl_projection)
                     best_embeddings = all_embeddings
                     best_labels = all_labels
                     best_proto_centroids = proto_centroids

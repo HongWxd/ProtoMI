@@ -19,6 +19,18 @@ from tqdm import tqdm
 
 warnings.filterwarnings('ignore')
 
+
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('true'):
+        return True
+    elif v.lower() in ('false'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 parser = argparse.ArgumentParser(description="Train the model")
 # basic configs
 parser.add_argument('--method', type=str, default='full_model', help='recommendation method')
@@ -81,9 +93,9 @@ parser.add_argument('--threshold', type=float, default=0.3, help='threshold')
 parser.add_argument('--topk', type=int, default=25, help='top k samples for each prototype')
 parser.add_argument('--pcl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 parser.add_argument('--save_proto_drift', type=bool, default=False, help='Whether to save prototype drift information')
-parser.add_argument('--EMA', type=bool, default=True, help='Whether to activate Exponential Moving Average (EMA) for prototype updating')
-parser.add_argument('--use_decor_loss', type=bool, default=True, help='Whether to activate decorrelation loss for prototype learning')
-parser.add_argument('--use_topk', type=bool, default=True, help='Whether to activate top-k selection for prototype learning')
+parser.add_argument('--EMA', type=str2bool, default=True, help='Whether to activate Exponential Moving Average (EMA) for prototype updating')
+parser.add_argument('--use_decor_loss', type=str2bool, default=True, help='Whether to activate decorrelation loss for prototype learning')
+parser.add_argument('--use_topk', type=str2bool, default=True, help='Whether to activate top-k selection for prototype learning')
 
 
 
@@ -134,6 +146,9 @@ if __name__ == '__main__':
         os.makedirs(f"./{args.save_path}")
 
 
+    print(args.EMA, args.device)
+
+
     ### recommendation method selection and model training
     if args.method == 'random':
         print("Loading data...")
@@ -177,7 +192,7 @@ if __name__ == '__main__':
 
         torch.save(total_best_encoders.state_dict(), f'{args.save_path}/PCL_encoder_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
         torch.save(total_best_projections.state_dict(), f'{args.save_path}/PCL_projection_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-        torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids.pth')
+        torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
 
 
     else:

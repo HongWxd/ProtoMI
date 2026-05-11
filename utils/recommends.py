@@ -47,7 +47,7 @@ class Recommender():
         PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
 
 
-        proto_centroids = torch.load(f'{self.save_path}/proto_centroids.pth')
+        proto_centroids = torch.load(f'{self.save_path}/proto_centroids_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
 
         # load USL model
         USL_encoder = Cluster_GINE(num_node_features=self.single_sample.x.shape[1], num_edge_features=self.single_sample.edge_attr.shape[1], 
