@@ -211,7 +211,7 @@ class PostScreening():
             return False, -1
 
 
-    def filter_by_commercial(self, samples_df, max_workers=2):
+    def filter_by_commercial(self, samples_df, max_workers=4):
         """
         多线程检查分子是否具有 CAS 号。
 
@@ -359,7 +359,7 @@ class PostScreening():
 
         # filtered_samples_df.to_csv(f'./outputs/filter_list_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.csv', index=False)
 
-        # filtered_samples_df = self.filter_by_commercial(filtered_samples_df)
+        filtered_samples_df = self.filter_by_commercial(filtered_samples_df)
 
         remain_ids = set(filtered_samples_df['cid'].tolist())
 
