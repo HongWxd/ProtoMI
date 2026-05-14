@@ -14,8 +14,10 @@ from utils.post_screening import PostScreening
 from utils.USL import USL
 from utils.PCL import PCL
 from rdkit.Chem import DataStructs
-from utils.tools import mol_to_fp
+from utils.tools import mol_to_fp, extract_embeddings, select_by_cluster_centers
 from tqdm import tqdm
+from sklearn.cluster import MiniBatchKMeans
+from model import ProjectionHead
 
 warnings.filterwarnings('ignore')
 
@@ -39,12 +41,12 @@ parser.add_argument('--save_path', type=str, default='checkpoints_origin_backup'
 parser.add_argument('--device', type=str, default='cuda:7' if torch.cuda.is_available() else 'cpu', help='Device to use for training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data_V2.csv', help='Path to the CSV file containing the searching space data')
 parser.add_argument('--additive_json_path', type=str, default='./V3/processed_data/additives.json', help='Path to the JSON file containing additive data')
-parser.add_argument('--no_need_train', type=str2bool, default=False, help='')
-
 
 
 # baseline configs
 parser.add_argument('--num_select', type=int, default=30800 , help='Number of molecules to select')
+parser.add_argument('--encoder_similarity', type=str, default='max', choices=['max', 'mean'], help='Similarity aggregation for encoder-only baselines: max or mean over positive samples.')
+parser.add_argument('--cluster_num', type=int, default=7, help='Number of clusters for unsupervised_clustering baseline.')
 
 
 # unsupervised learning configs
@@ -99,13 +101,11 @@ parser.add_argument('--use_decor_loss', type=str2bool, default=True, help='Wheth
 parser.add_argument('--use_topk', type=str2bool, default=True, help='Whether to activate top-k selection for prototype learning')
 
 
-
 # post-screening configs
 parser.add_argument('--save_molecules', type=bool, default=True, help='Whether to save the recommended molecules after post-screening')
 # parser.add_argument('--best_prototype_path', type=str, default='./result_files/proto_table_trial_7.csv', help='Path to the CSV file containing the best prototypes')
 parser.add_argument('--post_screening_output_path', type=str, default='./outputs/', help='Path to the post-screening output file')
 parser.add_argument('--recommend_model', type=str, default='full_model', help='')
-
 
 
 args = parser.parse_args()
@@ -141,85 +141,306 @@ def morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph
     
     return morgan_loader
 
+# encoder-only recommendation baseline
+def encoder_only_positive_similarity_recommendation(args, pos_samples, unl_samples, encoder_type='pcl'):
+    """
+    Encoder-only positive similarity baseline.
+
+    encoder_type='usl':
+        Use USL encoder only, no PCL and no prototypes.
+
+    encoder_type='pcl':
+        Use pretrained PCL encoder + projection, but recommendation does NOT use prototypes.
+        It only ranks candidates by similarity to positive-sample embeddings.
+
+    Recommendation score:
+        max_i cosine(z_unl, z_pos_i)  if args.encoder_similarity == 'max'
+        mean_i cosine(z_unl, z_pos_i) if args.encoder_similarity == 'mean'
+    """
+    pos_loader = DataLoader(pos_samples, batch_size=args.pcl_batch_size, shuffle=False)
+    unl_loader = DataLoader(unl_samples, batch_size=args.pcl_batch_size, shuffle=False)
+
+    if encoder_type == 'usl':
+        usl = USL(args)
+        usl_encoder = usl.get_representation_model(pos_samples, [])
+        encoder = usl_encoder.to(args.device)
+        projection = ProjectionHead(in_dim=args.usl_hidden_channels).to(args.device)
+        print('Using USL encoder-only positive similarity baseline.')
+
+    elif encoder_type == 'pcl':
+        pcl = PCL(args, pos_samples)
+
+        if pcl.is_trained is False:
+            raise Exception('PCL model not trained yet. Please train the PCL model before running the encoder-only baseline with PCL encoder.')
+        else:
+            encoder, projection = pcl.load_pcl_encoder_and_projection(pos_samples[0])
+
+        print('Using PCL encoder-only positive similarity baseline.')
+
+    else:
+        raise ValueError(f'Unknown encoder_type: {encoder_type}')
+
+    emb_pos, pos_ids = extract_embeddings(
+        encoder=encoder,
+        dataloader=pos_loader,
+        device=args.device,
+        projection=projection,
+        normalize_embedding=True
+    )
+
+    emb_unl_all, unl_ids_all = extract_embeddings(
+        encoder=encoder,
+        dataloader=unl_loader,
+        device=args.device,
+        projection=projection,
+        normalize_embedding=True
+    )
+
+    # cosine similarity because embeddings are normalized
+    sim_matrix = emb_unl_all @ emb_pos.T
+
+    if args.encoder_similarity == 'max':
+        scores = sim_matrix.max(dim=1).values
+    elif args.encoder_similarity == 'mean':
+        scores = sim_matrix.mean(dim=1)
+    else:
+        raise ValueError(f'Unknown encoder_similarity: {args.encoder_similarity}')
+
+    num_select = min(args.num_select, scores.numel())
+    top_idx = torch.topk(scores, k=num_select).indices
+
+    selected_emb_unl = emb_unl_all[top_idx]
+    selected_unl_ids = unl_ids_all[top_idx]
+    selected_scores = scores[top_idx]
+
+    # label = -1 means no prototype label is assigned.
+    selected_labels = (-1) * torch.ones(selected_unl_ids.size(0), dtype=torch.long)
+
+    predict_labels_df = pd.DataFrame({
+        'id': selected_unl_ids.cpu().numpy(),
+        'label': selected_labels.cpu().numpy(),
+        'encoder_similarity_score': selected_scores.cpu().numpy(),
+    })
+
+    print(f'{encoder_type.upper()} encoder-only selected molecules:', len(predict_labels_df))
+    print('Selected similarity score range:',
+          float(selected_scores.min()), 'to', float(selected_scores.max()))
+
+    return selected_emb_unl, selected_labels, selected_unl_ids, None, predict_labels_df
+
+# unsupervised clustering recommendation baseline
+def unsupervised_clustering_recommendation(args, pos_samples, unl_samples, encoder_type='pcl'):
+    """
+    Unsupervised clustering baseline.
+
+    It does not use positive-derived prototypes in the recommendation step.
+    It clusters unlabeled embeddings and selects representative molecules near cluster centers.
+
+    args.cluster_encoder='usl':
+        Use USL encoder.
+
+    args.cluster_encoder='pcl':
+        Use PCL encoder + projection, but no positive-derived prototype selection.
+    """
+
+    pos_loader = DataLoader(pos_samples, batch_size=args.pcl_batch_size, shuffle=False)
+    unl_loader = DataLoader(unl_samples, batch_size=args.pcl_batch_size, shuffle=False)
+
+    if encoder_type == 'usl':
+        usl = USL(args)
+        usl_encoder = usl.get_representation_model(pos_samples, [])
+        encoder = usl_encoder.to(args.device)
+        projection = ProjectionHead(in_dim=args.usl_hidden_channels).to(args.device)
+        print('Using USL encoder for unsupervised clustering baseline.')
+
+    elif encoder_type == 'pcl':
+        pcl = PCL(args, pos_samples)
+
+        if pcl.is_trained is False:
+            raise Exception('PCL model not trained yet. Please train the PCL model before running the encoder-only baseline with PCL encoder.')
+        else:
+            encoder, projection = pcl.load_pcl_encoder_and_projection(pos_samples[0])
+
+        print('Using PCL encoder for unsupervised clustering baseline.')
+
+    else:
+        raise ValueError(f'Unknown cluster_encoder: {encoder_type}')
+
+    emb_unl_all, unl_ids_all = extract_embeddings(
+        encoder=encoder,
+        dataloader=unl_loader,
+        device=args.device,
+        projection=projection,
+        normalize_embedding=True
+    )
+
+    X = emb_unl_all.numpy()
+    cluster_num = min(args.cluster_num, len(X))
+
+    print(f'Running MiniBatchKMeans with n_clusters={cluster_num}...')
+    kmeans = MiniBatchKMeans(
+        n_clusters=cluster_num,
+        random_state=args.random_state,
+        batch_size=max(1024, args.pcl_batch_size),
+        n_init=10
+    )
+
+    cluster_labels = kmeans.fit_predict(X)
+    selected_idx = select_by_cluster_centers(
+        embeddings=emb_unl_all,
+        ids=unl_ids_all,
+        cluster_labels=cluster_labels,
+        cluster_centers=kmeans.cluster_centers_,
+        num_select=min(args.num_select, len(X))
+    )
+
+    selected_emb_unl = emb_unl_all[selected_idx]
+    selected_unl_ids = unl_ids_all[selected_idx]
+
+    selected_labels = torch.tensor(
+        cluster_labels[selected_idx.numpy()],
+        dtype=torch.long
+    ) + 1
+
+    predict_labels_df = pd.DataFrame({
+        'id': selected_unl_ids.cpu().numpy(),
+        'label': selected_labels.cpu().numpy(),
+        'cluster_label': selected_labels.cpu().numpy(),
+    })
+
+    print('Unsupervised clustering selected molecules:', len(predict_labels_df))
+    print('Cluster distribution among selected molecules:')
+    print(predict_labels_df['cluster_label'].value_counts().sort_index())
+
+    return selected_emb_unl, selected_labels, selected_unl_ids, None, predict_labels_df
+
+
 
 if __name__ == '__main__':
     if not os.path.exists(f"./{args.save_path}"):
         os.makedirs(f"./{args.save_path}")
 
 
-    if args.no_need_train is False:
-        ### recommendation method selection and model training
-        if args.method == 'random':
-            print("Loading data...")
-            _, unlabeled_samples, _, _, _, _ = load_data(args)
+    ### recommendation method selection and model training
+    if args.method == 'random':
+        print("Loading data...")
+        _, unlabeled_samples, _, _, _, _ = load_data(args)
 
-            print('Random recommendation is selected. No model will be trained.')
-            unl_loader = random_recommendation(unlabeled_samples, args.random_state)
-            pos_loader = None
+        print('Random recommendation is selected. No model will be trained.')
+        unl_loader = random_recommendation(unlabeled_samples, args.random_state)
+        pos_loader = None
 
-        elif args.method == 'morgan':
-            print("Loading data...")
-            positive_samples, unlabeled_samples, unl_samples_graph = load_data(args)
+    elif args.method == 'morgan':
+        print("Loading data...")
+        positive_samples, unlabeled_samples, unl_samples_graph = load_data(args)
 
-            print('Morgan fingerprint-based recommendation is selected. No model will be trained.')
-            unl_loader = morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph)
-            pos_loader = None
+        print('Morgan fingerprint-based recommendation is selected. No model will be trained.')
+        unl_loader = morgan_recommendation(positive_samples, unlabeled_samples, unl_samples_graph)
+        pos_loader = None
 
-        elif args.method == 'full_model':
-            ### load data
-            print("Loading data...")
-            positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+    elif args.method == 'full_model':
+        ### load data
+        print("Loading data...")
+        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
 
-            print('Model-based recommendation is selected. Start training the models and doing recommendation.')
-            print("Getting the representation model...")
+        print('Model-based recommendation is selected. Start training the models and doing recommendation.')
+        print("Getting the representation model...")
 
-            all_pos_samples = pos_train_samples + pos_test_samples
-            pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-            unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-            print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
+        all_pos_samples = pos_train_samples + pos_test_samples
+        pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+        unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
+        print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
 
-            # training the unsupervised learning model (USL)
-            usl = USL(args)
-            usl_encoder = usl.get_representation_model(pos_train_samples, pos_test_samples)
+        # training the unsupervised learning model (USL)
+        usl = USL(args)
+        usl_encoder = usl.get_representation_model(pos_train_samples, pos_test_samples)
 
 
-            # training the prototype contrastive learning model (PCL)
-            proto_train_samples = pos_train_samples + unl_train_samples
-            proto_test_samples = pos_test_samples + unl_test_samples
-            pcl = PCL(args, all_pos_samples)
+        # training the prototype contrastive learning model (PCL)
+        proto_train_samples = pos_train_samples + unl_train_samples
+        proto_test_samples = pos_test_samples + unl_test_samples
+        pcl = PCL(args, all_pos_samples)
+
+        if pcl.is_trained is False:
+            ### train the PCL model
             total_best_encoders, total_best_projections, total_best_embeddings, total_best_labels, total_best_proto_centroids = pcl.pcl_training(usl_encoder, proto_train_samples, proto_test_samples)
-
+            # save the best PCL model
             torch.save(total_best_encoders.state_dict(), f'{args.save_path}/PCL_encoder_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
             torch.save(total_best_projections.state_dict(), f'{args.save_path}/PCL_projection_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
             torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-
-
         else:
-            raise Exception('Invalid recommendation method. Please choose either "random" or "full_model".')
+            print('Pretrained PCL model detected. Loading the model and doing recommendation...')
+    
+    elif args.method == 'usl_encoder_only':
+        print("Loading data...")
+        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
+        all_pos_samples = pos_train_samples + pos_test_samples
+        all_unl_samples = unl_train_samples + unl_test_samples
+
+        emb_unl, unl_labels, unl_ids, unl_sc_score, predict_labels_df = encoder_only_positive_similarity_recommendation(
+            args=args,
+            pos_samples=all_pos_samples,
+            unl_samples=all_unl_samples,
+            encoder_type='usl'
+        )
+
+    elif args.method == 'pcl_encoder_only':
+        print("Loading data...")
+        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
+        all_pos_samples = pos_train_samples + pos_test_samples
+        all_unl_samples = unl_train_samples + unl_test_samples
+
+        emb_unl, unl_labels, unl_ids, unl_sc_score, predict_labels_df = encoder_only_positive_similarity_recommendation(
+            args=args,
+            pos_samples=all_pos_samples,
+            unl_samples=all_unl_samples,
+            encoder_type='pcl'
+        )
+
+    elif args.method == 'usl_encoder_clustering':
+        print("Loading data...")
+        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
+        all_pos_samples = pos_train_samples + pos_test_samples
+        all_unl_samples = unl_train_samples + unl_test_samples
+
+        emb_unl, unl_labels, unl_ids, unl_sc_score, predict_labels_df = unsupervised_clustering_recommendation(
+            args=args,
+            pos_samples=all_pos_samples,
+            unl_samples=all_unl_samples,
+            encoder_type='usl'
+        )
+
+    elif args.method == 'pcl_encoder_clustering':
+        print("Loading data...")
+        positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
+
+        all_pos_samples = pos_train_samples + pos_test_samples
+        all_unl_samples = unl_train_samples + unl_test_samples
+
+        emb_unl, unl_labels, unl_ids, unl_sc_score, predict_labels_df = unsupervised_clustering_recommendation(
+            args=args,
+            pos_samples=all_pos_samples,
+            unl_samples=all_unl_samples,
+            encoder_type='pcl'
+        )
+
     else:
-        print('\nDirectly do the recommendation and post-screening')    
+        raise Exception('Invalid recommendation method.')
 
 
-        if args.method == 'full_model':
-            ### load data
-            print("Loading data...")
-            positive_samples_126, unlabeled_samples, pos_train_samples, pos_test_samples, unl_train_samples, unl_test_samples = load_data(args)
-
-            print('Model-based recommendation is selected. Start training the models and doing recommendation.')
-            print("Getting the representation model...")
-
-            all_pos_samples = pos_train_samples + pos_test_samples
-            pos_loader = DataLoader(pos_train_samples + pos_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-            unl_loader = DataLoader(unl_train_samples + unl_test_samples, batch_size=args.pcl_batch_size, shuffle=False)
-            print('Loaded data: Positive samples:', len(positive_samples_126), 'Unlabeled samples:', len(unlabeled_samples))
-           
 
 
 
     ### do the molecular recommendation
-    print('\nStart the recommendation process...')
-    recommender = Recommender(args, pos_loader, unl_loader)
-    emb_pos, pos_labels, pos_ids, pos_sc_score, emb_unl, unl_labels, unl_ids, unl_sc_score, predict_labels_df = do_recommendation(recommender, pos_loader, unl_loader)
+    if args.method in ['usl_encoder_only', 'pcl_encoder_only', 'usl_encoder_clustering', 'pcl_encoder_clustering']:
+        print('Encoder-only positive similarity recommendation is done. No need to do the rest of the recommendation process.')
+    else:
+        print('\nStart the recommendation process...')
+        recommender = Recommender(args, pos_loader, unl_loader)
+        emb_pos, pos_labels, pos_ids, pos_sc_score, emb_unl, unl_labels, unl_ids, unl_sc_score, predict_labels_df = do_recommendation(recommender, pos_loader, unl_loader)
 
 
 

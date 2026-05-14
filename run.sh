@@ -5,7 +5,7 @@ data_path=./data/all_data.pkl
 additive_json_path=./data/additives.json
 searching_space_path=./data/searching_space_data_V2.csv
 
-method=full_model
+method=pcl_encoder_clustering
 recommend_model=full_model
 seed=42
 usl_trials=10 # 10
@@ -13,10 +13,10 @@ epoch=200 # 200
 pcl_trials=10 # 10
 proto_epoch=300 # 300
 EMA=True
-use_decor_loss=False
+use_decor_loss=True
 use_topk=True
 device=cuda:6
-no_need_train=True
+encoder_similarity=max
 
 
 echo "======================================"
@@ -45,4 +45,4 @@ python run_main.py \
     --searching_space_path $searching_space_path \
     --additive_json_path $additive_json_path \
     --recommend_model $recommend_model \
-    --no_need_train $no_need_train
+    --encoder_similarity $encoder_similarity

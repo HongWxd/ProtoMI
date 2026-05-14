@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -37,6 +38,9 @@ class PCL():
         self.EMA = args.EMA
         self.use_decor_loss = args.use_decor_loss
         self.use_topk = args.use_topk
+        self.recommend_model = args.recommend_model
+
+        self.is_trained = self.checkpoints_detected()
 
 
     def get_prototypes(self, usl_encoder, pos_samples, trial, args):
@@ -310,3 +314,18 @@ class PCL():
         print(f'Best trial: {best_trial_idx + 1} | Best silhouette score: {total_sc_scores[best_trial_idx]}')
 
         return total_best_encoders[best_trial_idx], total_best_projections[best_trial_idx], total_best_embeddings[best_trial_idx], total_best_labels[best_trial_idx], total_best_proto_centroids[best_trial_idx]
+    
+    def load_pcl_encoder_and_projection(self, single_sample):
+        PCL_encoder = GINE(num_node_features=single_sample.x.shape[1], num_edge_features=single_sample.edge_attr.shape[1], 
+        hidden_channels=self.pcl_hidden_channels,
+        num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+        PCL_projection = ProjectionHead_PCL(in_dim=self.pcl_hidden_channels).to(self.device)
+        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
+        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
+
+        return PCL_encoder, PCL_projection
+    
+    def checkpoints_detected(self):
+        pcl_encoder_file_path = f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth'
+        pcl_projection_file_path = f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth'
+        return os.path.exists(pcl_encoder_file_path) and os.path.exists(pcl_projection_file_path)

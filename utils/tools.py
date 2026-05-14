@@ -14,6 +14,7 @@ from pymatgen.core import Composition
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
 
 
 device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
@@ -353,3 +354,111 @@ def collect_mol_info_by_ids(ids, searching_space_df):
 
 def mol_to_fp(mol, radius=2, nBits=2048):
     return AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nBits)
+
+def extract_embeddings(encoder, dataloader, device, projection=None, normalize_embedding=True):
+    encoder.eval()
+    if projection is not None:
+        projection.eval()
+
+    all_embeddings = []
+    all_ids = []
+
+    with torch.no_grad():
+        for data in tqdm(dataloader, desc='Extracting embeddings'):
+            data = data.to(device)
+            emb = encoder(data.x, data.edge_index, data.edge_attr, data.batch)
+
+            if projection is not None:
+                emb = projection(emb)
+
+            if normalize_embedding:
+                emb = F.normalize(emb, dim=-1)
+
+            all_embeddings.append(emb.cpu())
+            all_ids.append(data.id.cpu())
+
+    all_embeddings = torch.cat(all_embeddings, dim=0)
+    all_ids = torch.cat(all_ids, dim=0)
+
+    return all_embeddings, all_ids
+
+def select_by_cluster_centers(embeddings, ids, cluster_labels, cluster_centers, num_select):
+    """
+    Select representative molecules near cluster centers.
+
+    The selection is balanced across clusters:
+    1) rank molecules inside each cluster by cosine similarity to its cluster center
+    2) round-robin select from clusters until num_select is reached
+    """
+
+    Z = F.normalize(embeddings, dim=-1)
+    C = torch.tensor(cluster_centers, dtype=torch.float32)
+    C = F.normalize(C, dim=-1)
+
+    cluster_labels = np.asarray(cluster_labels)
+    num_clusters = C.shape[0]
+
+    ranked_indices_by_cluster = []
+
+    for k in range(num_clusters):
+        idx = np.where(cluster_labels == k)[0]
+
+        if len(idx) == 0:
+            ranked_indices_by_cluster.append([])
+            continue
+
+        idx_tensor = torch.tensor(idx, dtype=torch.long)
+        sims = Z[idx_tensor] @ C[k].unsqueeze(1)
+        sims = sims.squeeze(1)
+
+        order = torch.argsort(sims, descending=True).cpu().numpy().tolist()
+        ranked_indices = [idx[i] for i in order]
+        ranked_indices_by_cluster.append(ranked_indices)
+
+    selected_indices = []
+    selected_set = set()
+
+    # round-robin selection for balanced cluster coverage
+    pointers = [0 for _ in range(num_clusters)]
+
+    while len(selected_indices) < num_select:
+        added = False
+
+        for k in range(num_clusters):
+            cluster_ranked = ranked_indices_by_cluster[k]
+
+            while pointers[k] < len(cluster_ranked) and cluster_ranked[pointers[k]] in selected_set:
+                pointers[k] += 1
+
+            if pointers[k] < len(cluster_ranked):
+                idx = cluster_ranked[pointers[k]]
+                selected_indices.append(idx)
+                selected_set.add(idx)
+                pointers[k] += 1
+                added = True
+
+                if len(selected_indices) >= num_select:
+                    break
+
+        if not added:
+            break
+
+    # If still not enough, fill with globally closest-to-center molecules.
+    if len(selected_indices) < num_select:
+        all_best_sims = []
+        for k in range(num_clusters):
+            sims_k = Z @ C[k].unsqueeze(1)
+            all_best_sims.append(sims_k.squeeze(1))
+        global_scores = torch.stack(all_best_sims, dim=1).max(dim=1).values
+        global_order = torch.argsort(global_scores, descending=True).cpu().numpy().tolist()
+
+        for idx in global_order:
+            if idx not in selected_set:
+                selected_indices.append(idx)
+                selected_set.add(idx)
+
+            if len(selected_indices) >= num_select:
+                break
+
+    selected_indices = selected_indices[:num_select]
+    return torch.tensor(selected_indices, dtype=torch.long)
