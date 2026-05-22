@@ -5,7 +5,7 @@ data_path=./data/all_data.pkl
 additive_json_path=./data/additives.json
 searching_space_path=./data/searching_space_data_V2.csv
 
-method=pcl_encoder_clustering
+method=full_model
 recommend_model=full_model
 seed=42
 usl_trials=10 # 10
@@ -17,7 +17,7 @@ use_decor_loss=True
 use_topk=True
 device=cuda:6
 encoder_similarity=max
-
+usl_backbone=GINE
 
 echo "======================================"
 echo "Running recommendation pipeline"
@@ -45,4 +45,5 @@ python run_main.py \
     --searching_space_path $searching_space_path \
     --additive_json_path $additive_json_path \
     --recommend_model $recommend_model \
-    --encoder_similarity $encoder_similarity
+    --encoder_similarity $encoder_similarity \
+    --usl_backbone $usl_backbone

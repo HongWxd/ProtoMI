@@ -1,0 +1,11 @@
+========== USL Augmentation Silhouette Summary ==========
+Model backbone: GINE
+Number of trials: 10
+Best trial: 8
+Best silhouette score: 0.917715
+Mean silhouette score: 0.840598
+Std silhouette score: 0.038536
+Silhouette score: 0.840598 ± 0.038536
+All trial scores:
+0.861411, 0.814940, 0.819337, 0.866666, 0.841729, 0.813855, 0.851128, 0.917715, 0.844567, 0.774631
+=========================================================

@@ -1,9 +1,0 @@
-idx,additive,CEI,High_voltage_performance_CEI,SEI,Optimal_operating_temperature
-298,B-HEMA,Not found,Not found,Not found,40°C
-327,B-HEMA,Not found,Not found,Not found,23°C
-362,NaTFPB,"The NaTFPB additive undergoes preferential redox decomposition, forming a uniform and stable cathode electrolyte interphase (CEI) layer enriched with NaF and boron compounds, which is robust and enhances interfacial stability.","The pouch cell with NaTFPB additive maintains an exceptional capacity retention of 96% after 250 cycles under harsh conditions of 4.1V and 45°C, compared to the Base electrolyte which drops to 80% after only 112 cycles.","The NaTFPB additive facilitates the formation of a compact and uniform solid electrolyte interphase (SEI) layer on the hard carbon anode, enriched with NaF and boron compounds, which suppresses side reactions, reduces interface impedance, and inhibits sodium dendrite formation.",Not found
-466,TTFEB,"TTFEB exhibits strong interaction with ClO4-, and the TTFEB-ClO4- complex accumulates on the surface of NFM during the charging process and decomposes to form a thin and stable cathode-electrolyte interface (CEI), thereby improving interface stability.",Not found,Not found,Not found
-508,B2O3,Not found,Not found,Not found,Not found
-546,h-BN,Not found,Not found,Not found,Not found
-583,h-BN,Not found,Not found,Not found,Not found
-653,TPFPB,"The anion receptor TPFPB preferentially oxidizes to promote the formation of a robust NaF-rich CEI layer, which is uniform and compact, preventing excessive electrolyte decomposition and improving interfacial stability.","At a high cut-off voltage of 4.2 V vs. Na+/Na and high temperature of 60 °C, the battery with TPFPB additive has a capacity retention of 86.9% after 100 cycles, compared to 66.6% for the control electrolyte.",Not found,Not found

@@ -10,3 +10,15 @@
 /legacy
 /ablation
 /ablation_checkpoints
+/results
+/plots
+/ablation_checkpoints_2
+/checkpoints_origin_backup
+/checkpoints_no_decor_loss
+/outputs
+/result_files
+/result_files_origin_backup
+/V3/processed_data
+/V3/raw_data
+/V3/plot_data
+/V3/CEI_SEI_details

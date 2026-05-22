@@ -4,7 +4,7 @@ import copy
 import torch.nn.functional as F
 
 from tqdm import tqdm
-from model import ProjectionHead, Cluster_GINE
+from model import ProjectionHead, Cluster_GINE, Cluster_GAT, Cluster_GCN, Cluster_GIN
 from torch_geometric.loader import DataLoader
 from sklearn.metrics import silhouette_score
 from scipy.cluster.hierarchy import linkage
@@ -28,6 +28,7 @@ class USL():
         self.usl_hidden_channels = args.usl_hidden_channels
         self.dropout = args.dropout
         self.retrain_usl = args.retrain_usl
+        self.usl_backbone = args.usl_backbone
 
 
     def unsupervised_training(self, pos_train_samples, pos_test_samples):
@@ -35,8 +36,20 @@ class USL():
         # train a GNN model to represent all positive training data and get the prototypes
         pos_train_samples = pos_train_samples + pos_test_samples
         train_loader = DataLoader(pos_train_samples, batch_size=self.usl_batch_size, shuffle=True)
-        model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+        
+        if self.usl_backbone == 'GINE':
+            model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
                 hidden_channels=self.usl_hidden_channels, num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+        elif self.usl_backbone == 'GAT':
+            model = Cluster_GAT(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                hidden_channels=self.usl_hidden_channels, num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+        elif self.usl_backbone == 'GCN':
+            model = Cluster_GCN(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                hidden_channels=self.usl_hidden_channels, num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+        elif self.usl_backbone == 'GIN':
+            model = Cluster_GIN(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                hidden_channels=self.usl_hidden_channels, num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+        
         projection_head1 = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
         projection_head2 = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
 
@@ -104,13 +117,27 @@ class USL():
         return best_model, silhouette_scores
 
     def get_representation_model(self, pos_train_samples, pos_test_samples):
-        file_path = f"{self.save_path}/USL_encoder_{self.epoch}.pth"        
+        file_path = f"{self.save_path}/USL_encoder_{self.epoch}_{self.usl_backbone}.pth"        
         if os.path.exists(file_path):
             print(f"Loading the pretrained model from {file_path}...")
 
-            model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
-                hidden_channels=self.usl_hidden_channels,
-                num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+            if self.usl_backbone == 'GINE':
+                model = Cluster_GINE(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                    hidden_channels=self.usl_hidden_channels,
+                    num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+            elif self.usl_backbone == 'GAT':
+                model = Cluster_GAT(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                    hidden_channels=self.usl_hidden_channels,
+                    num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+            elif self.usl_backbone == 'GCN':
+                model = Cluster_GCN(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                    hidden_channels=self.usl_hidden_channels,
+                    num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+            elif self.usl_backbone == 'GIN':
+                model = Cluster_GIN(num_node_features=pos_train_samples[0].x.shape[1], num_edge_features=pos_train_samples[0].edge_attr.shape[1], 
+                    hidden_channels=self.usl_hidden_channels,
+                    num_classes=self.num_classes, dropout=self.dropout).to(self.device)
+            
             model.load_state_dict(torch.load(file_path)) # load the checkpoints
             best_model = model
         else:

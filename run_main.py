@@ -64,6 +64,7 @@ parser.add_argument('--num_heads', type=int, default=4, help='Number of heads fo
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
 parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
 parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
+parser.add_argument('--usl_backbone', type=str, default='GINE', help='Backbone GNN model for USL. Options: GINE, GAT')
 
 
 # graph augmentation configs
