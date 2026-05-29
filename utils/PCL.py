@@ -39,6 +39,7 @@ class PCL():
         self.use_decor_loss = args.use_decor_loss
         self.use_topk = args.use_topk
         self.recommend_model = args.recommend_model
+        self.save_proto_drift = args.save_proto_drift
 
         self.is_trained = self.checkpoints_detected()
 
@@ -124,6 +125,7 @@ class PCL():
 
     def prototype_contrastive_training(self, epoch, pcl_encoder, pcl_projection, optimizer, proto_train_loader, proto_centroids):    
         pcl_encoder.train()
+        pcl_projection.train()
         epoch_train_loss = 0
         total_samples = 0
         num_prototypes = proto_centroids.size(0)
@@ -280,9 +282,9 @@ class PCL():
                     else:
                         proto_centroids = new_proto_centroids
                 
-                # if self.save_proto_drift:
-                #     torch.save(proto_centroids, f"/data/hwx/boron/prototype_checkpoints/proto_trial_{trial}_epoch_{epoch}.pth")
-                #     print(f'Prototypes for trial {trial} epoch {epoch} are saved.')
+                if self.save_proto_drift:
+                    torch.save(proto_centroids, f"/data/hwx/boron/prototype_checkpoints/proto_trial_{trial}_epoch_{epoch}.pth")
+                    print(f'Prototypes for trial {trial} epoch {epoch} are saved.')
 
                 # training
                 pcl_encoder, pcl_projection, avg_epoch_train_loss = self.prototype_contrastive_training(epoch, pcl_encoder, pcl_projection, optimizer, proto_train_loader, proto_centroids)

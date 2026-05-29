@@ -1,6 +1,6 @@
 #!/bin/bash
 
-save_path=./ablation_checkpoints
+save_path=./proto_trajectory_checkpoints
 data_path=./data/all_data.pkl
 additive_json_path=./data/additives.json
 searching_space_path=./data/searching_space_data_V2.csv
@@ -18,6 +18,7 @@ use_topk=True
 device=cuda:6
 encoder_similarity=max
 usl_backbone=GINE
+save_proto_drift=True
 
 echo "======================================"
 echo "Running recommendation pipeline"
@@ -46,4 +47,5 @@ python run_main.py \
     --additive_json_path $additive_json_path \
     --recommend_model $recommend_model \
     --encoder_similarity $encoder_similarity \
-    --usl_backbone $usl_backbone
+    --usl_backbone $usl_backbone \
+    --save_proto_drift $save_proto_drift
