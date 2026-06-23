@@ -13,13 +13,10 @@ from utils.graph_augmentation import Graph_Augmentation_Helper
 from sklearn.decomposition import PCA
 
 class MoleculeDataset(Dataset):
-    def __init__(self, labeled_path, searching_space_path):
-        with open(labeled_path, 'r') as file:
-            additives_data = json.load(file)
-        
+    def __init__(self, additives_data, searching_space_df):
         self.reported_smiles = [i['smiles'] for i in additives_data.values()]
         self.reported_formulas = additives_data.keys()
-        self.searching_space_df = pd.DataFrame(pd.read_csv(searching_space_path))
+        self.searching_space_df = searching_space_df
 
         self.cids = list(sorted(set(self.searching_space_df['cid'].values)))
         self.cids = [int(i) for i in self.cids]
@@ -118,20 +115,79 @@ class MoleculeDataset(Dataset):
         return data_list
 
     def analysis_dataset(self, data_list):
-        nodes, edges, nodes_feature, edges_feature = 0, 0, 0, 0
-        for value in data_list:
-            nodes += value.n_nodes
-            edges += value.n_edges
-            nodes_feature += value.x.shape[1]
-            edges_feature += value.edge_attr.shape[1]
+
+        atoms_list = []
+        bonds_list = []
+        avg_degree_list = []
+        density_list = []
+        entropy_list = []
+
+        for data in data_list:
+
+            n_nodes = data.n_nodes
+            n_edges = data.n_edges
+
+            # ---------------------
+            # Atoms
+            # ---------------------
+            atoms_list.append(n_nodes)
+
+            # ---------------------
+            # Bonds
+            # ---------------------
+            bonds_list.append(n_edges)
+
+            # ---------------------
+            # Average degree
+            # <k>=2E/N
+            # ---------------------
+            avg_degree = 2 * n_edges / n_nodes
+            avg_degree_list.append(avg_degree)
+
+            # ---------------------
+            # Graph density
+            # D=2E/[N(N-1)]
+            # undirected graph
+            # ---------------------
+            density = 2 * n_edges / (n_nodes * (n_nodes - 1) + 1e-12)
+            density_list.append(density)
+
+            # ---------------------
+            # Degree entropy
+            # H=-Σp(k)ln(p(k))
+            # ---------------------
+            row = data.edge_index[0].cpu().numpy()
+            degree = np.bincount(row, minlength=n_nodes)
+
+            p = degree / (degree.sum() + 1e-12)
+
+            entropy = -(p * np.log(p + 1e-12)).sum()
+
+            entropy_list.append(entropy)
+
+
+        # =========================
+        # Convert to numpy
+        # =========================
+        atoms_list = np.array(atoms_list)
+        bonds_list = np.array(bonds_list)
+        avg_degree_list = np.array(avg_degree_list)
+        density_list = np.array(density_list)
+        entropy_list = np.array(entropy_list)
+
+
+        print('--------- Dataset Statistics ---------')
+
+        print(f'Atoms          : {atoms_list.mean():.2f} ± {atoms_list.std():.2f}')
+
+        print(f'Bonds          : {bonds_list.mean():.2f} ± {bonds_list.std():.2f}')
+
+        print(f'Average degree : {avg_degree_list.mean():.3f} ± {avg_degree_list.std():.3f}')
+
+        print(f'Graph density  : {density_list.mean():.3f} ± {density_list.std():.3f}')
+
+        print(f'Degree entropy : {entropy_list.mean():.3f} ± {entropy_list.std():.3f}')
         
-        print('---------Here is the basic info of loaded dataset---------')
-        print('avg nodes:', nodes / self.__len__())
-        print('number of edges:', edges / self.__len__())
-        print('nodes feature:', nodes_feature / self.__len__())
-        print('edges feature:', edges_feature / self.__len__())
-        print('number of degrees:', 2 * edges / self.__len__())
-        print('avg degree:', 2 * edges / nodes)
     
     def get_mean_std_values(self):
         total_all_masses = []
@@ -160,12 +216,30 @@ class MoleculeDataset(Dataset):
 
 
 def load_data(args):
+    # load the year mapping file
+    with open(args.year_mapping_path, 'r', encoding='utf-8') as f:
+        year_mapping = json.load(f)
+    
+    # split training data by year
+    if args.split_year == 'all':
+        positive_num = year_mapping['n_positive']
+
+    else:
+        split_name = f'cutoff_{args.split_year}'
+
+        positive_num = (
+            year_mapping['cutoffs'][split_name]
+            ['train_positive_end_idx']
+            + 1
+        )
+
+
     if args.method == 'morgan':
         # data preparation for graph data
         with open(args.data_path, 'rb') as f:
             all_data = pickle.load(f)
 
-        unlabeled_samples_graph = all_data[126:]
+        unlabeled_samples_graph = all_data[positive_num:]
 
         # load smiles data for Morgan fingerprint baseline
         with open(args.additive_json_path, 'r') as f:
@@ -174,7 +248,9 @@ def load_data(args):
         searching_space = pd.read_csv(args.searching_space_path)
 
         positive_samples = []
-        for _, v in positive_data.items():
+        for i, (_, v) in enumerate(positive_data.items()):
+            if i >= positive_num:
+                break
             positive_samples.append(v['smiles'])
         
         unlabeled_samples = [{'id': int(id), 'smiles': smile} for id, smile in zip(searching_space['cid'].values.tolist(), searching_space['SMILES'].values.tolist())]
@@ -186,8 +262,8 @@ def load_data(args):
         with open(args.data_path, 'rb') as f:
             all_data = pickle.load(f)
 
-        positive_samples = all_data[:126] # number of positive samples
-        unlabeled_samples = all_data[126:]
+        positive_samples = all_data[:positive_num] # number of positive samples
+        unlabeled_samples = all_data[positive_num:]
 
         graph_aug_helper = Graph_Augmentation_Helper(positive_samples, args)
         pos_train_samples, pos_test_samples = graph_aug_helper.train_test_split_positive_samples()

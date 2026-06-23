@@ -40,6 +40,7 @@ class PCL():
         self.use_topk = args.use_topk
         self.recommend_model = args.recommend_model
         self.save_proto_drift = args.save_proto_drift
+        self.split_year = args.split_year
 
         self.is_trained = self.checkpoints_detected()
 
@@ -119,6 +120,8 @@ class PCL():
         
         proto_centroids = torch.tensor(proto_centroids, dtype=torch.float32)
         proto_centroids = F.normalize(proto_centroids, dim=1)
+
+        print(f'Updated prototype centroids with shape: {proto_centroids.shape}')
 
         return proto_centroids
 
@@ -282,8 +285,9 @@ class PCL():
                     else:
                         proto_centroids = new_proto_centroids
                 
+
                 if self.save_proto_drift:
-                    torch.save(proto_centroids, f"/data/hwx/boron/prototype_checkpoints/proto_trial_{trial}_epoch_{epoch}.pth")
+                    torch.save(proto_centroids, f"/data/hwx/boron/new_proto_save/proto_trial_{trial}_epoch_{epoch}.pth")
                     print(f'Prototypes for trial {trial} epoch {epoch} are saved.')
 
                 # training
@@ -322,12 +326,12 @@ class PCL():
         hidden_channels=self.pcl_hidden_channels,
         num_classes=self.num_classes, dropout=self.dropout).to(self.device)
         PCL_projection = ProjectionHead_PCL(in_dim=self.pcl_hidden_channels).to(self.device)
-        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
-        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
+        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')) # load the checkpoints
+        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')) # load the checkpoints
 
         return PCL_encoder, PCL_projection
     
     def checkpoints_detected(self):
-        pcl_encoder_file_path = f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth'
-        pcl_projection_file_path = f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth'
+        pcl_encoder_file_path = f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth'
+        pcl_projection_file_path = f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth'
         return os.path.exists(pcl_encoder_file_path) and os.path.exists(pcl_projection_file_path)

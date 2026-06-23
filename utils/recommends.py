@@ -1,7 +1,7 @@
 import torch
 import pandas as pd
 import torch.nn.functional as F
-
+from tqdm import tqdm
 from utils.data_loader import load_data
 from sklearn.metrics import silhouette_score
 from torch_geometric.loader import DataLoader
@@ -13,7 +13,7 @@ from model import ProjectionHead_PCL, GINE, Cluster_GINE, ProjectionHead
 class Recommender():
     def __init__(self, args, pos_loader, unl_loader):
 
-        self.file_path = f"{args.save_path}/USL_encoder_{args.epoch}.pth"
+        self.file_path = f"{args.save_path}/USL_encoder_{args.epoch}_{args.usl_backbone}_{args.split_year}.pth"
         self.pcl_batch_size = args.pcl_batch_size
         self.pcl_hidden_channels = args.pcl_hidden_channels
         self.num_classes = args.num_classes
@@ -32,6 +32,7 @@ class Recommender():
         self.single_sample = next(iter(unl_loader)).to_data_list()[0]
         self.device = args.device
         self.recommend_model = args.recommend_model
+        self.split_year = args.split_year
 
 
         self.PCL_encoder, self.PCL_projection, self.USL_encoder, self.USL_projection, self.proto_centroids = self.prepare_model()
@@ -43,11 +44,11 @@ class Recommender():
         hidden_channels=self.pcl_hidden_channels,
         num_classes=self.num_classes, dropout=self.dropout).to(self.device)
         PCL_projection = ProjectionHead_PCL(in_dim=self.pcl_hidden_channels).to(self.device)
-        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
-        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')) # load the checkpoints
+        PCL_encoder.load_state_dict(torch.load(f'{self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')) # load the checkpoints
+        PCL_projection.load_state_dict(torch.load(f'{self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')) # load the checkpoints
 
 
-        proto_centroids = torch.load(f'{self.save_path}/proto_centroids_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
+        proto_centroids = torch.load(f'{self.save_path}/proto_centroids_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')
 
         # load USL model
         USL_encoder = Cluster_GINE(num_node_features=self.single_sample.x.shape[1], num_edge_features=self.single_sample.edge_attr.shape[1], 
@@ -56,9 +57,9 @@ class Recommender():
         USL_encoder.load_state_dict(torch.load(f'{self.file_path}')) # load the checkpoints
         USL_projection = ProjectionHead(in_dim=self.usl_hidden_channels).to(self.device)
 
-        print(f'Encoder is loaded from {self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
-        print(f'Projection is loaded from {self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
-        print(f'Prototype centroid is loaded from {self.save_path}/proto_centroids_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.pth')
+        print(f'Encoder is loaded from {self.save_path}/PCL_encoder_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')
+        print(f'Projection is loaded from {self.save_path}/PCL_projection_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')
+        print(f'Prototype centroid is loaded from {self.save_path}/proto_centroids_{self.recommend_model}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.pth')
 
 
         return PCL_encoder, PCL_projection, USL_encoder, USL_projection, proto_centroids
@@ -118,6 +119,7 @@ class Recommender():
             sc_score = None
 
         return all_embeddings, all_labels, all_ids, sc_score
+
 
 
 def do_recommendation(recommender, pos_loader, unl_loader):

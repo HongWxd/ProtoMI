@@ -1,9 +1,10 @@
 #!/bin/bash
 
-save_path=./proto_trajectory_checkpoints
-data_path=./data/all_data.pkl
-additive_json_path=./data/additives.json
+save_path=./eval_2023
+data_path=./data/all_data_year.pkl
+additive_json_path=./data/additives_year_sorted.json
 searching_space_path=./data/searching_space_data_V2.csv
+post_screening_output_path=./eval_2023
 
 method=full_model
 recommend_model=full_model
@@ -15,10 +16,13 @@ proto_epoch=300 # 300
 EMA=True
 use_decor_loss=True
 use_topk=True
-device=cuda:6
+device=cuda:7
 encoder_similarity=max
 usl_backbone=GINE
 save_proto_drift=True
+split_year=2023 # 2017, 2019, 2021, 2023, all
+
+
 
 echo "======================================"
 echo "Running recommendation pipeline"
@@ -29,6 +33,8 @@ echo "USE_DECOR_LOSS: $use_decor_loss"
 echo "USE_TOPK: $use_topk"
 echo "DEVICE: $device"
 echo "======================================"
+
+
 
 python run_main.py \
     --method $method \
@@ -48,4 +54,6 @@ python run_main.py \
     --recommend_model $recommend_model \
     --encoder_similarity $encoder_similarity \
     --usl_backbone $usl_backbone \
-    --save_proto_drift $save_proto_drift
+    --save_proto_drift $save_proto_drift \
+    --split_year $split_year \
+    --post_screening_output_path $post_screening_output_path

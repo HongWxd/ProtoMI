@@ -1,0 +1,8 @@
+Prototype,Number of annotated records,Dominant mechanisms
+P1,17,SEI/CEI formation (88.2%); LiF/B-O interface (70.6%); Solvation/desolvation (70.6%); Thermal/corrosion stability (70.6%); Polymer/gel strengthening (64.7%)
+P2,32,SEI/CEI formation (81.2%); Lewis acid/anion receptor (78.1%); LiF/B-O interface (75.0%); Thermal/corrosion stability (56.2%); Solvation/desolvation (53.1%)
+P3,69,SEI/CEI formation (98.6%); LiF/B-O interface (79.7%); Thermal/corrosion stability (71.0%); HF/H2O scavenging (56.5%); Polymer/gel strengthening (53.6%)
+P4,26,HF/H2O scavenging (84.6%); Thermal/corrosion stability (73.1%); SEI/CEI formation (57.7%); LiF/B-O interface (53.8%); Lewis acid/anion receptor (34.6%)
+P5,34,SEI/CEI formation (76.5%); Thermal/corrosion stability (73.5%); LiF/B-O interface (64.7%); Lewis acid/anion receptor (44.1%); HF/H2O scavenging (38.2%)
+P6,19,LiF/B-O interface (89.5%); SEI/CEI formation (78.9%); Lewis acid/anion receptor (78.9%); HF/H2O scavenging (73.7%); Thermal/corrosion stability (57.9%)
+P7,30,SEI/CEI formation (93.3%); Lewis acid/anion receptor (80.0%); Polymer/gel strengthening (63.3%); Solvation/desolvation (60.0%); LiF/B-O interface (53.3%)

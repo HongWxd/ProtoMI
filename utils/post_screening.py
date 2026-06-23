@@ -29,6 +29,7 @@ class PostScreening():
         self.EMA = args.EMA
         self.use_decor_loss = args.use_decor_loss
         self.use_topk = args.use_topk
+        self.split_year = args.split_year
 
         with open(args.additive_json_path, 'r') as f:
             self.positive_data = json.load(f)
@@ -380,11 +381,12 @@ class PostScreening():
         mol_info_after_post_screen_df = collect_mol_info_by_ids(filtered_unl_ids, self.searching_space)
 
         if self.save_molecules:
-            mol_info_after_post_screen_df.to_csv(self.post_screening_output_path + f'recommendations_after_post_screening_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.csv', index=False)
+            mol_info_after_post_screen_df.to_csv(self.post_screening_output_path + f'/recommendations_after_post_screening_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.csv', index=False)
             
             # save embeddings
-            np.save(self.post_screening_output_path + f'embeddings_after_post_screening_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}.npy', filtered_emb_unl.cpu().numpy())
+            np.save(self.post_screening_output_path + f'/embeddings_after_post_screening_{self.method}_ema_{self.EMA}_decor_{self.use_decor_loss}_topk_{self.use_topk}_year_{self.split_year}.npy', filtered_emb_unl.cpu().numpy())
 
+            print('Saved filtered molecules and embeddings to:', self.post_screening_output_path)
 
         return mol_info_after_post_screen_df
 

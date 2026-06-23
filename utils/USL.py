@@ -29,6 +29,7 @@ class USL():
         self.dropout = args.dropout
         self.retrain_usl = args.retrain_usl
         self.usl_backbone = args.usl_backbone
+        self.split_year = args.split_year
 
 
     def unsupervised_training(self, pos_train_samples, pos_test_samples):
@@ -117,7 +118,7 @@ class USL():
         return best_model, silhouette_scores
 
     def get_representation_model(self, pos_train_samples, pos_test_samples):
-        file_path = f"{self.save_path}/USL_encoder_{self.epoch}_{self.usl_backbone}.pth"        
+        file_path = f"{self.save_path}/USL_encoder_{self.epoch}_{self.usl_backbone}_{self.split_year}.pth"        
         if os.path.exists(file_path):
             print(f"Loading the pretrained model from {file_path}...")
 

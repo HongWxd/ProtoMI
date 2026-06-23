@@ -36,11 +36,13 @@ def str2bool(v):
 parser = argparse.ArgumentParser(description="Train the model")
 # basic configs
 parser.add_argument('--method', type=str, default='full_model', help='recommendation method')
-parser.add_argument('--data_path', type=str, default='./data/all_data.pkl', help='Path to the preprocessed data')
+parser.add_argument('--data_path', type=str, default='./data/all_data_year.pkl', help='Path to the preprocessed data')
 parser.add_argument('--save_path', type=str, default='checkpoints_origin_backup', help='')
 parser.add_argument('--device', type=str, default='cuda:7' if torch.cuda.is_available() else 'cpu', help='Device to use for training')
 parser.add_argument('--searching_space_path', type=str, default='./data/searching_space_data_V2.csv', help='Path to the CSV file containing the searching space data')
-parser.add_argument('--additive_json_path', type=str, default='./V3/processed_data/additives.json', help='Path to the JSON file containing additive data')
+parser.add_argument('--additive_json_path', type=str, default='./data/additives_year_sorted.json', help='Path to the JSON file containing additive data')
+parser.add_argument('--year_mapping_path', type=str, default='./data/year_split_mapping.json', help='Path to the JSON file containing year mapping data')
+parser.add_argument('--split_year', type=str, default='all', help='Year to split the data')
 
 
 # baseline configs
@@ -50,7 +52,7 @@ parser.add_argument('--cluster_num', type=int, default=7, help='Number of cluste
 
 
 # unsupervised learning configs
-parser.add_argument('--analysis', type=bool, default=False, help='Wether to print the summary of the dataset')
+parser.add_argument('--analysis', type=str2bool, default=False, help='Wether to print the summary of the dataset')
 parser.add_argument('--usl_batch_size', type=int, default=256, help='Batch size for training')
 parser.add_argument('--num_classes', type=int, default=2, help='Number of classes')
 parser.add_argument('--usl_learning_rate', type=float, default=0.0005, help='Learning rate')
@@ -62,7 +64,7 @@ parser.add_argument('--models', type=str, default='GINE', help='Training models'
 parser.add_argument('--embed_dim', type=int, default=256, help='Embedding dimension of attention')
 parser.add_argument('--num_heads', type=int, default=4, help='Number of heads for attention')
 parser.add_argument('--desp_dim', type=int, default=217, help='Number of descriptors')
-parser.add_argument('--retrain_usl', type=bool, default=False, help='retrain the usl models')
+parser.add_argument('--retrain_usl', type=str2bool, default=False, help='retrain the usl models')
 parser.add_argument('--usl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
 parser.add_argument('--usl_backbone', type=str, default='GINE', help='Backbone GNN model for USL. Options: GINE, GAT')
 
@@ -96,14 +98,14 @@ parser.add_argument('--pcl_batch_size', type=int, default=1024, help='Batch size
 parser.add_argument('--threshold', type=float, default=0.3, help='threshold')
 parser.add_argument('--topk', type=int, default=25, help='top k samples for each prototype')
 parser.add_argument('--pcl_trials', type=int, default=10, help='Number of trials for unsupervised learning')
-parser.add_argument('--save_proto_drift', type=bool, default=False, help='Whether to save prototype drift information')
+parser.add_argument('--save_proto_drift', type=str2bool, default=False, help='Whether to save prototype drift information')
 parser.add_argument('--EMA', type=str2bool, default=True, help='Whether to activate Exponential Moving Average (EMA) for prototype updating')
 parser.add_argument('--use_decor_loss', type=str2bool, default=True, help='Whether to activate decorrelation loss for prototype learning')
 parser.add_argument('--use_topk', type=str2bool, default=True, help='Whether to activate top-k selection for prototype learning')
 
 
 # post-screening configs
-parser.add_argument('--save_molecules', type=bool, default=True, help='Whether to save the recommended molecules after post-screening')
+parser.add_argument('--save_molecules', type=str2bool, default=True, help='Whether to save the recommended molecules after post-screening')
 # parser.add_argument('--best_prototype_path', type=str, default='./result_files/proto_table_trial_7.csv', help='Path to the CSV file containing the best prototypes')
 parser.add_argument('--post_screening_output_path', type=str, default='./outputs/', help='Path to the post-screening output file')
 parser.add_argument('--recommend_model', type=str, default='full_model', help='')
@@ -322,7 +324,7 @@ if __name__ == '__main__':
         os.makedirs(f"./{args.save_path}")
 
 
-    ### recommendation method selection and model training
+    ## recommendation method selection and model training
     if args.method == 'random':
         print("Loading data...")
         _, unlabeled_samples, _, _, _, _ = load_data(args)
@@ -366,9 +368,9 @@ if __name__ == '__main__':
             ### train the PCL model
             total_best_encoders, total_best_projections, total_best_embeddings, total_best_labels, total_best_proto_centroids = pcl.pcl_training(usl_encoder, proto_train_samples, proto_test_samples)
             # save the best PCL model
-            torch.save(total_best_encoders.state_dict(), f'{args.save_path}/PCL_encoder_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-            torch.save(total_best_projections.state_dict(), f'{args.save_path}/PCL_projection_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
-            torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}.pth')
+            torch.save(total_best_encoders.state_dict(), f'{args.save_path}/PCL_encoder_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}_year_{args.split_year}.pth')
+            torch.save(total_best_projections.state_dict(), f'{args.save_path}/PCL_projection_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}_year_{args.split_year}.pth')
+            torch.save(total_best_proto_centroids, f'{args.save_path}/proto_centroids_{args.method}_ema_{args.EMA}_decor_{args.use_decor_loss}_topk_{args.use_topk}_year_{args.split_year}.pth')
         else:
             print('Pretrained PCL model detected. Loading the model and doing recommendation...')
     
