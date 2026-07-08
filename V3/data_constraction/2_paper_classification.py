@@ -92,7 +92,7 @@ def CEI_SEI_details(papers_idx_list, system_type):
             print(f'Paper {idx}.pdf is not found, skip')
             continue
             
-        client = OpenAI(api_key="sk-846361ec44554e6dbacc9fc7a103232b", base_url="https://api.deepseek.com")
+        client = OpenAI(api_key="your_api_key", base_url="https://api.deepseek.com")
 
         system_prompt = """
         The user will provide some exam text. Please parse the 'question' and 'answer' and output them in JSON format. 

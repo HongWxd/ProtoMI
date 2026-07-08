@@ -91,7 +91,7 @@ Z = linkage(dist_matrix, method='ward')
 
 # 3️⃣ 画树状图
 plt.figure(figsize=(10, 8))
-dendrogram(Z, labels=additives_names, leaf_rotation=90)
+dendrogram(Z, labels=additives_names, leaf_rotation=90, color_threshold=5)
 plt.title("Hierarchical Clustering of Additives (126 positive samples)")
 plt.xlabel("Additive")
 plt.ylabel("Distance")
@@ -99,43 +99,43 @@ plt.tight_layout()
 plt.savefig("./V3/plots/additives_hierarchical_clustering.png", dpi=600)
 
 
-possible_clusters = range(2, 11)  # 尝试从2到10个簇
-best_score = -1
-best_k = None
-best_labels = None
+# possible_clusters = range(2, 11)  # 尝试从2到10个簇
+# best_score = -1
+# best_k = None
+# best_labels = None
 
-for k in possible_clusters:
-    cluster_labels = fcluster(Z, t=k, criterion='maxclust')
-    try:
-        score = silhouette_score(dist_matrix, cluster_labels, metric='precomputed')
-        print(f"k={k}, silhouette score={score:.4f}")
-        if score > best_score:
-            best_score = score
-            best_k = k
-            best_labels = cluster_labels 
-    except Exception as e:
-        print(f"k={k} failed: {e}")
+# for k in possible_clusters:
+#     cluster_labels = fcluster(Z, t=k, criterion='maxclust')
+#     try:
+#         score = silhouette_score(dist_matrix, cluster_labels, metric='precomputed')
+#         print(f"k={k}, silhouette score={score:.4f}")
+#         if score > best_score:
+#             best_score = score
+#             best_k = k
+#             best_labels = cluster_labels 
+#     except Exception as e:
+#         print(f"k={k} failed: {e}")
 
-print(f"\n✅ 最佳簇数: {best_k}, 对应的平均轮廓系数: {best_score:.4f}")
+# print(f"\n✅ 最佳簇数: {best_k}, 对应的平均轮廓系数: {best_score:.4f}")
 
-# 保存最佳聚类结果
-additive_df = pd.DataFrame({
-    "Name": additives_names,
-    "Cluster": best_labels
-})
-additive_df.to_csv("./V3/processed_data/additive_clustered_best.csv", index=False)
-print("✅ 已保存: additive_clustered_best.csv")
+# # 保存最佳聚类结果
+# additive_df = pd.DataFrame({
+#     "Name": additives_names,
+#     "Cluster": best_labels
+# })
+# additive_df.to_csv("./V3/processed_data/additive_clustered_best.csv", index=False)
+# print("✅ 已保存: additive_clustered_best.csv")
 
-# 可视化不同簇在UMAP上的分布
-plt.figure(figsize=(8,6))
-for i in range(1, best_k+1):
-    plt.scatter(additive_emb[best_labels==i, 0], additive_emb[best_labels==i, 1], s=40, label=f"Cluster {i}", alpha=0.7)
-plt.legend()
-plt.title(f"UMAP Projection (Best Clusters = {best_k})")
-plt.xlabel("UMAP-1")
-plt.ylabel("UMAP-2")
-plt.tight_layout()
-plt.savefig("./V3/plots/additives_umap_best_cluster.png", dpi=600)
+# # 可视化不同簇在UMAP上的分布
+# plt.figure(figsize=(8,6))
+# for i in range(1, best_k+1):
+#     plt.scatter(additive_emb[best_labels==i, 0], additive_emb[best_labels==i, 1], s=40, label=f"Cluster {i}", alpha=0.7)
+# plt.legend()
+# plt.title(f"UMAP Projection (Best Clusters = {best_k})")
+# plt.xlabel("UMAP-1")
+# plt.ylabel("UMAP-2")
+# plt.tight_layout()
+# plt.savefig("./V3/plots/additives_umap_best_cluster.png", dpi=600)
 
 # fig = plt.figure(figsize=(10,8))
 # ax = fig.add_subplot(111, projection='3d')

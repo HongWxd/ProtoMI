@@ -7,7 +7,7 @@ import pandas as pd
 import re
 
 def label_by_AI(title, text):
-    client = OpenAI(api_key="sk-846361ec44554e6dbacc9fc7a103232b", base_url="https://api.deepseek.com")
+    client = OpenAI(api_key="your_api_key", base_url="https://api.deepseek.com")
 
     system_prompt = """
     The user will provide some exam text. Please parse the 'question' and 'answer' and output them in JSON format. 
@@ -65,7 +65,7 @@ def label_by_AI(title, text):
     return labeled_answer
 
 def check_by_AI(doi, electrolyte, additive):
-    client = OpenAI(api_key="sk-846361ec44554e6dbacc9fc7a103232b", base_url="https://api.deepseek.com")
+    client = OpenAI(api_key="your_api_key", base_url="https://api.deepseek.com")
 
     system_prompt = """
     The user will provide some information. Please parse the 'question' and 'answer' and output them in JSON format. 

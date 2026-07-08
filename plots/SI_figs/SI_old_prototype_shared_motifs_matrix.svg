@@ -1,7 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2290" height="1845" viewBox="0 0 2290 1845">
-<rect x="0" y="0" width="2290" height="1845" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="2340" height="1845" viewBox="0 0 2340 1845" style="background: transparent;">
 
-    <text x="1145.0" y="55"
+    <text x="1170.0" y="55"
           text-anchor="middle"
           font-family="Arial"
           font-size="34"
@@ -11,7 +10,7 @@
     </text>
     
 
-    <text x="1145.0" y="95"
+    <text x="1170.0" y="95"
           text-anchor="middle"
           font-family="Arial"
           font-size="20"
@@ -351,13 +350,6 @@ Q 91.8 103.4, 93.7 103.4
                 </g>
                 
 
-                <rect x="485" y="413"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="560.0" y="437"
                       text-anchor="middle"
                       font-family="Arial"
@@ -468,13 +460,6 @@ L 101.2 111.8
 L 101.2 99.1
 ' fill='#33CCCC'/>
                 </g>
-                
-
-                <rect x="1005" y="413"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1080.0" y="437"
@@ -592,13 +577,6 @@ Q 87.6 108.7, 88.6 110.0
 Q 89.7 111.3, 91.7 111.3
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="1525" y="413"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1600.0" y="437"
@@ -774,13 +752,6 @@ Q 103.1 112.2, 105.0 112.2
                 </g>
                 
 
-                <rect x="225" y="628"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="300.0" y="652"
                       text-anchor="middle"
                       font-family="Arial"
@@ -899,13 +870,6 @@ Q 89.7 100.8, 90.7 102.1
 Q 91.8 103.4, 93.7 103.4
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="485" y="628"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="560.0" y="652"
@@ -1068,13 +1032,6 @@ Q 46.7 17.3, 48.6 17.3
                 </g>
                 
 
-                <rect x="745" y="628"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="820.0" y="652"
                       text-anchor="middle"
                       font-family="Arial"
@@ -1211,13 +1168,6 @@ Q 89.7 111.3, 91.7 111.3
                 </g>
                 
 
-                <rect x="1525" y="628"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="1600.0" y="652"
                       text-anchor="middle"
                       font-family="Arial"
@@ -1320,13 +1270,6 @@ L 159.2 114.0
 L 159.2 104.7
 ' fill='#33CCCC'/>
                 </g>
-                
-
-                <rect x="1785" y="628"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1860.0" y="652"
@@ -1451,13 +1394,6 @@ Q 55.0 20.6, 56.0 21.9
 Q 57.1 23.2, 59.0 23.2
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="2045" y="628"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="2120.0" y="652"
@@ -1595,13 +1531,6 @@ Q 103.1 112.2, 105.0 112.2
                 </g>
                 
 
-                <rect x="225" y="843"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="300.0" y="867"
                       text-anchor="middle"
                       font-family="Arial"
@@ -1720,13 +1649,6 @@ Q 89.7 100.8, 90.7 102.1
 Q 91.8 103.4, 93.7 103.4
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="485" y="843"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="560.0" y="867"
@@ -1889,13 +1811,6 @@ Q 46.7 17.3, 48.6 17.3
                 </g>
                 
 
-                <rect x="745" y="843"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="820.0" y="867"
                       text-anchor="middle"
                       font-family="Arial"
@@ -2030,13 +1945,6 @@ Q 87.6 108.7, 88.6 110.0
 Q 89.7 111.3, 91.7 111.3
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="1525" y="843"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1600.0" y="867"
@@ -2182,13 +2090,6 @@ Q 57.1 23.2, 59.0 23.2
                 </g>
                 
 
-                <rect x="2045" y="843"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="2120.0" y="867"
                       text-anchor="middle"
                       font-family="Arial"
@@ -2324,13 +2225,6 @@ Q 103.1 112.2, 105.0 112.2
                 </g>
                 
 
-                <rect x="225" y="1058"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="300.0" y="1082"
                       text-anchor="middle"
                       font-family="Arial"
@@ -2449,13 +2343,6 @@ Q 89.7 100.8, 90.7 102.1
 Q 91.8 103.4, 93.7 103.4
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="485" y="1058"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="560.0" y="1082"
@@ -2613,13 +2500,6 @@ Q 89.7 111.3, 91.7 111.3
                 </g>
                 
 
-                <rect x="1525" y="1058"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="1600.0" y="1082"
                       text-anchor="middle"
                       font-family="Arial"
@@ -2763,13 +2643,6 @@ Q 57.1 23.2, 59.0 23.2
                 </g>
                 
 
-                <rect x="2045" y="1058"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="2120.0" y="1082"
                       text-anchor="middle"
                       font-family="Arial"
@@ -2909,13 +2782,6 @@ Q 91.8 103.4, 93.7 103.4
                 </g>
                 
 
-                <rect x="485" y="1273"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="560.0" y="1297"
                       text-anchor="middle"
                       font-family="Arial"
@@ -3026,13 +2892,6 @@ L 101.2 111.8
 L 101.2 99.1
 ' fill='#33CCCC'/>
                 </g>
-                
-
-                <rect x="1005" y="1273"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1080.0" y="1297"
@@ -3150,13 +3009,6 @@ Q 87.6 108.7, 88.6 110.0
 Q 89.7 111.3, 91.7 111.3
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="1525" y="1273"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1600.0" y="1297"
@@ -3332,13 +3184,6 @@ Q 103.1 112.2, 105.0 112.2
                 </g>
                 
 
-                <rect x="225" y="1488"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="300.0" y="1512"
                       text-anchor="middle"
                       font-family="Arial"
@@ -3457,13 +3302,6 @@ Q 89.7 100.8, 90.7 102.1
 Q 91.8 103.4, 93.7 103.4
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="485" y="1488"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="560.0" y="1512"
@@ -3595,13 +3433,6 @@ L 123.7 6.8
                 </g>
                 
 
-                <rect x="1265" y="1488"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="1340.0" y="1512"
                       text-anchor="middle"
                       font-family="Arial"
@@ -3698,13 +3529,6 @@ Q 87.6 108.7, 88.6 110.0
 Q 89.7 111.3, 91.7 111.3
 ' fill='#FF0000'/>
                 </g>
-                
-
-                <rect x="1525" y="1488"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1600.0" y="1512"
@@ -3880,13 +3704,6 @@ Q 103.1 112.2, 105.0 112.2
                 </g>
                 
 
-                <rect x="225" y="1703"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="300.0" y="1727"
                       text-anchor="middle"
                       font-family="Arial"
@@ -4007,13 +3824,6 @@ Q 91.8 103.4, 93.7 103.4
                 </g>
                 
 
-                <rect x="485" y="1703"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
-                
-
                 <text x="560.0" y="1727"
                       text-anchor="middle"
                       font-family="Arial"
@@ -4124,13 +3934,6 @@ L 101.2 111.8
 L 101.2 99.1
 ' fill='#33CCCC'/>
                 </g>
-                
-
-                <rect x="1005" y="1703"
-                      width="150" height="34"
-                      fill="white"
-                      fill-opacity="0.78"
-                      rx="8" ry="8"/>
                 
 
                 <text x="1080.0" y="1727"
