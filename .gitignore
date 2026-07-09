@@ -17,7 +17,6 @@
 /outputs
 /result_files
 /result_files_origin_backup
-/V3/processed_data
-/V3/raw_data
-/V3/plot_data
-/V3/CEI_SEI_details
+/plots/figs_data
+/plots/save_figs
+/plots/SI_figs

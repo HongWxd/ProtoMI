@@ -81,7 +81,7 @@ class PCL():
         # # plot UMAP cluster distribution
         # plot_cluster_distribution_UMAP(best_cluster_num, labels, umap_embeddings, trial, self.args)
 
-        additive_id_mapping = pd.read_csv(f'./V3/processed_data/additive_id_mapping.csv')
+        additive_id_mapping = pd.read_csv(f'./data/additive_id_mapping.csv')
         
         pos_additives_ids = [i for i in pos_additives_names]
         pos_additives_name = [additive_id_mapping.loc[additive_id_mapping['id'] == i,'name'].values for i in pos_additives_ids]

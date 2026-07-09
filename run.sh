@@ -1,10 +1,10 @@
 #!/bin/bash
 
-save_path=./eval_2023
+save_path=./test
 data_path=./data/all_data_year.pkl
 additive_json_path=./data/additives_year_sorted.json
 searching_space_path=./data/searching_space_data_V2.csv
-post_screening_output_path=./eval_2023
+post_screening_output_path=./test
 
 method=full_model
 recommend_model=full_model
@@ -20,7 +20,7 @@ device=cuda:7
 encoder_similarity=max
 usl_backbone=GINE
 save_proto_drift=True
-split_year=2023 # 2017, 2019, 2021, 2023, all
+split_year=all # 2017, 2019, 2021, 2023, all
 
 
 

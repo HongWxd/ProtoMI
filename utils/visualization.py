@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 
 def show_gnn_fp_consistency_results(additives_names, embeddings, best_k):
-    with open('./V3/processed_data/additives.json', "r", encoding="utf-8") as f:
+    with open('./data/additives.json', "r", encoding="utf-8") as f:
             additives_data = json.load(f)
 
     smiles_list = [additives_data[i]['smiles'] for i in additives_names]
@@ -74,7 +74,7 @@ def plot_hierarchical_cluster_dendrogram(Z, additives_names):
     plt.xlabel("Samples")
     plt.ylabel("Distance")
     plt.tight_layout()
-    plt.savefig("./V3/plots/positive_samples_hierarchical_clustering.png", dpi=600)
+    plt.savefig("./plots/save_figs/positive_samples_hierarchical_clustering.png", dpi=600)
 
 def plot_cluster_distribution_UMAP(best_k, best_labels, embeddings, trial, args):
     plt.figure(figsize=(8,6))
