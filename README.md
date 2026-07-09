@@ -51,13 +51,6 @@ ProtoMI/
 
 ## Installation
 
-We recommend creating a new conda environment.
-
-```bash
-conda create -n protomi python=3.10 -y
-conda activate protomi
-```
-
 Install the required packages:
 
 ```bash
@@ -81,8 +74,8 @@ Before training, prepare a `data/` folder under the repository root:
 ```text
 ProtoMI/
 └── data/
-    ├── additives_year.json
-    └── searching_space_data_V2.csv
+    ├── additives_year.json # reported molecules
+    └── searching_space_data_V2.csv # searching space
 ```
 
 ### 1. Positive additive file
